@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ascend.aryansaharan.com/sitemap.xml
