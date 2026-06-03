@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://ascend.aryansaharan.com";
+const SITE_URL = "https://ascendmvp.vercel.app";
 
 /**
  * Programmatic sitemap covering the four MVP routes.

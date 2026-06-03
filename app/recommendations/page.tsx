@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, ExternalLink, Loader2 } from "lucide-react";
 import { useProfile } from "@/lib/store";
 import { recommend, type Profile, type Recommendation } from "@/lib/recommend";
+import { COURSES } from "@/lib/courses";
 import { SaveSessionStub } from "@/components/SaveSessionStub";
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
@@ -112,7 +113,7 @@ export default function Recommendations() {
               >
                 <div className="flex items-center gap-2.5 text-foreground text-sm">
                   <Loader2 className="w-4 h-4 animate-spin text-muted" />
-                  Analyzing 25 courses against your profile
+                  Analyzing {COURSES.length} courses against your profile
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted">
                   <span>Checking:</span>

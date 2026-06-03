@@ -350,7 +350,7 @@ export const COURSES: Course[] = [
     level: "intermediate",
     skills: ["growth-marketing", "paid-acquisition", "marketing"],
     tracks: ["marketing", "growth", "founder"],
-    url: "https://www.demandcurve.com/programs/growth",
+    url: "https://www.demandcurve.com/growth-program",
     summary:
       "Practical, channel-by-channel growth playbook. Built for early-stage operators. Less theory, more 'do this on Monday'.",
   },
@@ -376,7 +376,7 @@ export const COURSES: Course[] = [
     level: "intermediate",
     skills: ["product-analytics", "experimentation", "growth"],
     tracks: ["growth", "pm", "pm-data"],
-    url: "https://gopractice.io/simulator/",
+    url: "https://gopractice.io/course/pm/",
     summary:
       "Live data-driven product decisions in a simulated startup. Strong on analytics intuition. Popular with growth-curious PMs.",
   },
@@ -414,7 +414,7 @@ export const COURSES: Course[] = [
     level: "intermediate",
     skills: ["b2b-sales", "saas-sales", "enterprise-sales"],
     tracks: ["sales", "founder"],
-    url: "https://winningbydesign.com/learning/saas-sales-method/",
+    url: "https://winningbydesign.com/resources/blueprints/the-saas-sales-method/",
     summary:
       "Operating system for B2B SaaS sales teams. Bowtie funnel, customer-centric process. Widely adopted in Series A to C startups.",
   },
@@ -435,12 +435,12 @@ export const COURSES: Course[] = [
   {
     id: "successhacker-csm-certification",
     title: "CSM Certification",
-    provider: "SuccessHACKER",
+    provider: "SuccessCOACHING",
     durationHours: 20,
     level: "beginner",
     skills: ["customer-success", "csm-fundamentals", "retention"],
     tracks: ["customer-success"],
-    url: "https://www.successhacker.co/training",
+    url: "https://successcoaching.co/csm-certification",
     summary:
       "Default entry cert for CS roles. Onboarding, QBRs, escalation, expansion. Employer-recognized for early-career CSMs.",
   },
@@ -464,7 +464,7 @@ export const COURSES: Course[] = [
     level: "intermediate",
     skills: ["customer-success", "csm-framework", "outcomes", "cs-leadership"],
     tracks: ["customer-success"],
-    url: "https://practicalcsm.com/the-practical-csm-framework/",
+    url: "https://practicalcsm.com/courses/customer-success-foundations-the-practical-csm-framework/",
     summary:
       "Outcomes-driven CSM playbook. Clear stages, repeatable rituals. Used by CS leaders to standardize team operating cadence.",
   },

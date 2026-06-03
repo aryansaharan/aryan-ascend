@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500"],
 });
 
-const SITE_URL = "https://ascend.aryansaharan.com";
+const SITE_URL = "https://ascendmvp.vercel.app";
 const SITE_NAME = "Ascend";
 const SITE_TAGLINE = "Find your next skill in 15 minutes";
 const SITE_DESCRIPTION =

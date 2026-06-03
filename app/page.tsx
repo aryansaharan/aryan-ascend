@@ -86,7 +86,7 @@ export default function Landing() {
             >
               <span className="inline-block w-4 h-px bg-muted-2" />
               <span className="mono-label">
-                Built from 25+ user interviews · 67% choice paralysis surfaced
+                Built from 25+ user interviews · 61% choice paralysis surfaced
               </span>
             </motion.div>
 

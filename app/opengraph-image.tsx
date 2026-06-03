@@ -160,7 +160,7 @@ export default function OpengraphImage() {
             }}
           >
             Map your role, goals, and time. Narrow hundreds of courses into a 3
-            to 5 shortlist you&rsquo;ll actually finish.
+            to 5 shortlist you&apos;ll actually finish.
           </div>
           <div
             style={{
@@ -172,7 +172,7 @@ export default function OpengraphImage() {
               letterSpacing: "0.04em",
             }}
           >
-            ascend.aryansaharan.com
+            ascendmvp.vercel.app
           </div>
         </div>
       </div>
