@@ -249,6 +249,21 @@ function RecCard({ rec }: { rec: Recommendation }) {
         {rec.whyThisFitsYou}
       </blockquote>
 
+      {/* Scoring signals: the inputs that actually moved this pick */}
+      {rec.fitNotes.length > 0 && (
+        <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="What this was scored on">
+          {rec.fitNotes.map((n) => (
+            <li
+              key={n.label}
+              title={n.text}
+              className="mono-label text-[9px] uppercase tracking-[0.16em] text-muted-2 bg-card-alt rounded-full px-2.5 py-1 cursor-default"
+            >
+              {n.label}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* Two fact rows */}
       <dl className="mt-4 flex flex-col gap-2 text-[13px] leading-relaxed">
         <div className="flex gap-2">

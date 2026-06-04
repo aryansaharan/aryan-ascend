@@ -221,6 +221,23 @@ export default function Compare() {
                   {rec.whyThisFitsYou}
                 </blockquote>
 
+                {rec.fitNotes.length > 0 && (
+                  <ul
+                    className="flex flex-wrap gap-1"
+                    aria-label="What this was scored on"
+                  >
+                    {rec.fitNotes.map((n) => (
+                      <li
+                        key={n.label}
+                        title={n.text}
+                        className="mono-label text-[9px] uppercase tracking-[0.14em] text-muted-2 bg-card-alt rounded-full px-2 py-0.5 cursor-default"
+                      >
+                        {n.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 <dl className="flex flex-col gap-2.5 text-[12px] leading-relaxed">
                   <div>
                     <dt className="text-[10px] uppercase tracking-[0.14em] text-muted-2">
@@ -243,7 +260,7 @@ export default function Compare() {
                       At your pace
                     </dt>
                     <dd className="mt-0.5 text-foreground/85">
-                      {rec.weeksToFinish} weeks at {rec.weeklyHours} hrs/week
+                      {rec.weeksToFinish} {rec.weeksToFinish === 1 ? "week" : "weeks"} at {rec.weeklyHours} hrs/week
                     </dd>
                   </div>
                 </dl>

@@ -22,16 +22,81 @@ export type Recommendation = {
   weeksToFinish: number;
 };
 
+// Lightweight role parsing: map the free-text "current role" answer to course
+// tracks so it actually influences ranking instead of being decorative.
+const ROLE_KEYWORDS: { re: RegExp; tracks: string[] }[] = [
+  { re: /full[\s-]?stack/, tracks: ["fullstack", "frontend", "backend"] },
+  { re: /front[\s-]?end|react|vue|angular|\bui engineer\b/, tracks: ["frontend", "fullstack"] },
+  { re: /back[\s-]?end|\bnode\b|\bapi\b|server|django|spring|golang/, tracks: ["backend", "fullstack"] },
+  { re: /devops|\bsre\b|platform|infra|cloud|kubernetes|docker|terraform/, tracks: ["devops", "platform-engineer"] },
+  { re: /data analyst|analytics|\bsql\b|tableau|business intelligence|\bbi\b/, tracks: ["data-analyst", "business-analyst"] },
+  { re: /data scien|machine learning|\bml\b|\bai\b|\bllm\b|deep learning/, tracks: ["data-scientist", "ml-engineer", "ai-engineer"] },
+  { re: /product manager|product owner|\bpm\b|product lead/, tracks: ["pm"] },
+  { re: /design|\bux\b|\bui\b|figma|user research/, tracks: ["designer"] },
+  { re: /market|\bseo\b|content|brand/, tracks: ["marketing"] },
+  { re: /growth|demand gen/, tracks: ["growth"] },
+  { re: /sales|account executive|\bae\b|\bsdr\b|\bbdr\b|business development/, tracks: ["sales"] },
+  { re: /customer success|\bcsm\b|account manager|onboarding specialist/, tracks: ["customer-success"] },
+  { re: /\bmanager\b|\blead\b|head of|director|\bvp\b|principal/, tracks: ["em", "staff-engineer"] },
+];
+
+function tracksFromRole(role: string): Set<string> {
+  const text = role.toLowerCase();
+  const out = new Set<string>();
+  for (const { re, tracks } of ROLE_KEYWORDS) {
+    if (re.test(text)) tracks.forEach((t) => out.add(t));
+  }
+  return out;
+}
+
+// Skills (or an advanced level) that signal senior-grade material. Used to fit
+// content depth to the user's years in the field.
+const SENIOR_SIGNAL_SKILLS = new Set([
+  "leadership",
+  "management",
+  "technical-leadership",
+  "staff-engineer",
+  "ic-track",
+  "product-strategy",
+  "growth-strategy",
+  "marketing-strategy",
+  "cs-leadership",
+  "go-to-market",
+  "product-discovery",
+  "positioning",
+  "system-design",
+  "distributed-systems",
+]);
+
+const SENIORITY: Record<Profile["experience"], number> = {
+  "0-1": 0,
+  "1-3": 1,
+  "3-5": 2,
+  "5+": 3,
+};
+
+function experienceLabel(e: Profile["experience"]): string {
+  return {
+    "0-1": "under a year",
+    "1-3": "1 to 3 years",
+    "3-5": "3 to 5 years",
+    "5+": "5+ years",
+  }[e];
+}
+
 /**
- * STUBBED recommender: deterministic scoring over profile + corpus.
- * Replace with an LLM call (OpenAI / Anthropic / Groq) for the real
- * version: pass profile + COURSES, ask for top-5 with reasoning.
+ * Deterministic recommender: multi-signal scoring over profile + corpus.
+ * Every assessment answer feeds a signal (interests, level, time, goal,
+ * experience, role). Designed so the scorer can be swapped for an LLM call
+ * later: pass profile + COURSES, ask for top-5 with reasoning.
  */
 export async function recommend(profile: Profile): Promise<Recommendation[]> {
   // Simulate latency so the UI's loading state has somewhere to live.
   await new Promise((r) => setTimeout(r, 900));
 
   const weeklyHours = parseTime(profile.timePerWeek);
+  const roleTracks = tracksFromRole(profile.currentRole);
+  const seniority = SENIORITY[profile.experience];
 
   const scored = COURSES.map((c) => {
     let score = 0;
@@ -72,10 +137,11 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
     // Time fit
     const weeksToFinish = c.durationHours / Math.max(weeklyHours, 1);
     if (weeksToFinish <= 4) {
+      const wks = Math.max(1, Math.round(weeksToFinish));
       score += 18;
       fitNotes.push({
         label: "Time",
-        text: `Finishable in about ${Math.max(1, Math.round(weeksToFinish))} week${weeksToFinish > 1 ? "s" : ""} at your pace.`,
+        text: `Finishable in about ${wks} week${wks === 1 ? "" : "s"} at your pace.`,
       });
     } else if (weeksToFinish <= 12) {
       score += 8;
@@ -110,6 +176,46 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
       });
     }
 
+    // Experience fit: does the depth suit the years you have behind you?
+    const hasSeniorSignal =
+      c.level === "advanced" || c.skills.some((s) => SENIOR_SIGNAL_SKILLS.has(s));
+    const isQuickIntro =
+      c.level === "beginner" && c.durationHours > 0 && c.durationHours <= 8;
+    if (seniority >= 2 && hasSeniorSignal) {
+      score += 12;
+      fitNotes.push({
+        label: "Experience",
+        text: `Pitched for the depth you have after ${experienceLabel(profile.experience)}, not a refresher.`,
+      });
+    } else if (seniority <= 1 && isQuickIntro) {
+      score += 8;
+      fitNotes.push({
+        label: "Experience",
+        text: `Right depth this early in. A clean place to start.`,
+      });
+    } else if (seniority >= 2 && isQuickIntro) {
+      score -= 8;
+      fitNotes.push({
+        label: "Experience",
+        text: `Likely too basic after ${experienceLabel(profile.experience)}. Skim, do not study.`,
+      });
+    } else if (seniority === 0 && c.level === "advanced") {
+      score -= 6;
+      fitNotes.push({
+        label: "Experience",
+        text: `Ambitious this early. Bookmark it once the fundamentals are solid.`,
+      });
+    }
+
+    // Role fit: connect the free-text current role to relevant tracks.
+    if (roleTracks.size > 0 && c.tracks.some((t) => roleTracks.has(t))) {
+      score += 8;
+      fitNotes.push({
+        label: "Your role",
+        text: `Lines up with the work your current role points to.`,
+      });
+    }
+
     return { course: c, score, fitNotes, weeksToFinish };
   });
 
@@ -119,7 +225,7 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
-  return top.map((t) => ({
+  return top.map((t, i) => ({
     course: t.course,
     score: t.score,
     fitNotes: t.fitNotes,
@@ -127,7 +233,7 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
     category: deriveCategory(t.course),
     careerImpact: deriveCareerImpact(t.course, profile),
     prerequisites: derivePrerequisites(t.course),
-    whyThisFitsYou: deriveWhyThisFits(t.course, profile),
+    whyThisFitsYou: deriveWhyThisFits(t.course, profile, i),
     weeklyHours,
     weeksToFinish: Math.max(1, Math.round(t.weeksToFinish)),
   }));
@@ -176,45 +282,127 @@ function deriveCategory(course: Course): string {
   return "General";
 }
 
+// Render skill tokens as readable labels (typescript -> TypeScript, sql -> SQL).
+// Unmapped tokens just lose their hyphens (system-design -> system design).
+const SKILL_LABELS: Record<string, string> = {
+  sql: "SQL",
+  aws: "AWS",
+  ux: "UX",
+  ml: "ML",
+  ai: "AI",
+  llm: "LLM",
+  seo: "SEO",
+  b2b: "B2B",
+  saas: "SaaS",
+  csm: "CSM",
+  k8s: "Kubernetes",
+  kubernetes: "Kubernetes",
+  iac: "infrastructure as code",
+  rag: "RAG",
+  dbt: "dbt",
+  sre: "SRE",
+  node: "Node.js",
+  nodejs: "Node.js",
+  typescript: "TypeScript",
+  react: "React",
+  python: "Python",
+  docker: "Docker",
+  terraform: "Terraform",
+  graphql: "GraphQL",
+  figma: "Figma",
+};
+
+function humanizeSkill(skill: string): string {
+  return SKILL_LABELS[skill] ?? skill.replace(/-/g, " ");
+}
+
+// The one or two skills that best characterize a course. Track-level tokens
+// (frontend / backend / ...) are stripped so the phrase stays specific and
+// doesn't echo the category word right next to it.
+const TRACK_TOKENS = new Set([
+  "frontend",
+  "backend",
+  "fullstack",
+  "devops",
+  "marketing",
+  "growth",
+  "sales",
+]);
+
+function courseFocus(course: Course): string {
+  const specific = course.skills.filter((s) => !TRACK_TOKENS.has(s));
+  const picked = (specific.length ? specific : course.skills).slice(0, 2);
+  return picked.map(humanizeSkill).join(" and ");
+}
+
 function deriveCareerImpact(course: Course, profile: Profile): string {
-  const cat = deriveCategory(course);
-  const role = profile.currentRole.trim() || "your current role";
+  const cat = deriveCategory(course).toLowerCase();
+  const focus = courseFocus(course);
 
   switch (profile.goal) {
     case "promotion":
-      return `Adds depth for the next title past ${role.toLowerCase()}. Often cited in ${cat.toLowerCase()} promo conversations.`;
+      return `Builds the ${focus} depth that holds up in ${cat} promotion cases.`;
     case "switch-field":
-      return `Provides the foundational vocabulary to credibly enter ${cat.toLowerCase()}.`;
+      return `Gives you credible ${focus} footing to break into ${cat}.`;
     case "salary":
-      return `High-signal in ${cat.toLowerCase()}. Concrete proof of skill for comp conversations.`;
+      return `${capitalize(focus)} is high-signal in ${cat} comp conversations.`;
     case "deeper-craft":
-      return `Sharpens your core ${cat.toLowerCase()} craft. Outcomes show up in the work itself.`;
+      return `Sharpens your ${focus} where the work actually happens, not just in theory.`;
     case "leadership":
-      return `Required vocabulary for leading teams in ${cat.toLowerCase()}.`;
+      return `The ${focus} grounding you need to lead ${cat} teams.`;
   }
 }
 
 function derivePrerequisites(course: Course): string {
   if (course.level === "beginner") return "None. This is your start.";
   if (course.level === "intermediate")
-    return `Comfort with the basics of ${course.skills[0] ?? "the topic"}.`;
-  return `Solid intermediate experience with ${course.skills.slice(0, 2).join(", ") || "the area"}.`;
+    return `Comfort with the basics of ${humanizeSkill(course.skills[0] ?? "the topic")}.`;
+  return `Solid intermediate experience with ${course.skills.slice(0, 2).map(humanizeSkill).join(", ") || "the area"}.`;
 }
 
-function deriveWhyThisFits(course: Course, profile: Profile): string {
-  const matchedTracks = course.tracks.filter((t) =>
-    profile.interests.includes(t),
-  );
-  const levelPhrase =
-    course.level === profile.level
-      ? `at your current ${course.level} level`
-      : `a step beyond ${profile.level}`;
+const LEVEL_ORDER: Record<Course["level"], number> = {
+  beginner: 0,
+  intermediate: 1,
+  advanced: 2,
+};
 
-  if (matchedTracks.length > 0) {
-    const trackName = TRACK_TO_CATEGORY[matchedTracks[0]] ?? matchedTracks[0];
-    return `You said ${trackName.toLowerCase()} was pulling you. This is the highest-fit option in that lane, ${levelPhrase}, that fits the time you said you'd give it.`;
-  }
-  return `Picked because it aligns with ${humanGoal(profile.goal)} and fits ${levelPhrase}.`;
+function deriveWhyThisFits(
+  course: Course,
+  profile: Profile,
+  rank: number,
+): string {
+  const matched = course.tracks.filter((t) => profile.interests.includes(t));
+  const lane = matched.length
+    ? (TRACK_TO_CATEGORY[matched[0]] ?? matched[0]).toLowerCase()
+    : null;
+
+  // Only the top pick gets to claim "closest match", so the cards don't all
+  // read identically.
+  const opener =
+    rank === 0
+      ? lane
+        ? `Your closest match on the ${lane} track.`
+        : `Your closest match for ${humanGoal(profile.goal)}.`
+      : rank === 1
+        ? lane
+          ? `A close runner-up on ${lane}.`
+          : `A close runner-up for ${humanGoal(profile.goal)}.`
+        : lane
+          ? `Also strong on ${lane}.`
+          : `Also strong for ${humanGoal(profile.goal)}.`;
+
+  // Honest about direction: a beginner course below your level is not a stretch.
+  const diff = LEVEL_ORDER[course.level] - LEVEL_ORDER[profile.level];
+  const levelClause =
+    diff === 0
+      ? `Pitched right at your ${profile.level} level`
+      : diff === 1
+        ? `One level past ${profile.level}, a deliberate stretch`
+        : diff >= 2
+          ? `A real jump above ${profile.level}, ambitious but doable with focus`
+          : `A notch below your ${profile.level} level, useful for filling gaps fast`;
+
+  return `${opener} ${levelClause}. ${course.summary}`;
 }
 
 function buildRationale(
