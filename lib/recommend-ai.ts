@@ -76,20 +76,34 @@ export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
   });
   const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
-  const completion = await client.chat.completions.create({
-    model,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: `${SYSTEM_PROMPT}\n\nCourse catalog (JSON array). Recommend only from these, by exact id:\n${catalogText}`,
-      },
-      {
-        role: "user",
-        content: `User profile (JSON):\n${JSON.stringify(profile)}\n\nReturn the JSON object with the 3 to 5 courses that genuinely fit this person best, strongest match first.`,
-      },
-    ],
-  });
+  const messages = [
+    {
+      role: "system" as const,
+      content: `${SYSTEM_PROMPT}\n\nCourse catalog (JSON array). Recommend only from these, by exact id:\n${catalogText}`,
+    },
+    {
+      role: "user" as const,
+      content: `User profile (JSON):\n${JSON.stringify(profile)}\n\nReturn the JSON object with the 3 to 5 courses that genuinely fit this person best, strongest match first.`,
+    },
+  ];
+
+  // Try JSON mode, then retry without response_format on a 400. Some
+  // OpenAI-compatible providers reject that field; the prompt already demands
+  // a bare JSON object and parsePicks handles fences defensively.
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model,
+      response_format: { type: "json_object" },
+      messages,
+    });
+  } catch (err) {
+    if (err instanceof OpenAI.APIError && err.status === 400) {
+      completion = await client.chat.completions.create({ model, messages });
+    } else {
+      throw err;
+    }
+  }
 
   const content = completion.choices[0]?.message?.content ?? "";
   if (!content) throw new Error("Model returned empty content");
