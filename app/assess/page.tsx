@@ -138,12 +138,12 @@ export default function Assess() {
   }
 
   function toggleMulti(opt: string) {
+    // Unselected chips are disabled once 3 are picked (see the cap below),
+    // so this only ever deselects or adds while under the cap.
     const current = (profile.interests ?? []) as string[];
-    const has = current.includes(opt);
-    let next: string[];
-    if (has) next = current.filter((c) => c !== opt);
-    else if (current.length >= 3) next = [...current.slice(1), opt];
-    else next = [...current, opt];
+    const next = current.includes(opt)
+      ? current.filter((c) => c !== opt)
+      : [...current, opt];
     setProfile({ interests: next });
   }
 
