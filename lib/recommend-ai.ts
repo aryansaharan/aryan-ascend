@@ -74,6 +74,10 @@ export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
   const client = new OpenAI({
     apiKey: process.env.AI_API_KEY,
     baseURL: process.env.AI_BASE_URL || undefined,
+    // Free tiers (e.g. Gemini) intermittently return 503/429 under load. The
+    // SDK retries 408/409/429/5xx with exponential backoff; give it more tries
+    // so a transient overload retries instead of dropping to the fallback.
+    maxRetries: 4,
   });
   const model = process.env.AI_MODEL ?? "gpt-4o-mini";
 

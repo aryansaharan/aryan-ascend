@@ -2,6 +2,8 @@ import { recommend, type Profile } from "@/lib/recommend";
 import { recommendAI } from "@/lib/recommend-ai";
 
 export const runtime = "nodejs";
+// Allow headroom for retrying transient provider 503/429s before falling back.
+export const maxDuration = 45;
 
 export async function POST(request: Request) {
   let profile: Profile;
