@@ -10,11 +10,12 @@ import {
 // Server-only. Imported only by app/api/recommend/route.ts so the SDK and the
 // API key never reach the client bundle.
 //
-// Provider-flexible: uses the OpenAI client, but OPENAI_BASE_URL can point it
-// at any OpenAI-compatible endpoint. Works as-is with:
-//   - OpenAI:  (no base url)             model e.g. gpt-4o-mini
-//   - Groq:    https://api.groq.com/openai/v1                 (free)
+// Provider-flexible: it uses the OpenAI client library (a de facto standard
+// for chat APIs), but the provider is config, not hardcoded. AI_BASE_URL points
+// it at any OpenAI-compatible endpoint. Works as-is with:
+//   - OpenAI:  AI_BASE_URL unset                 AI_MODEL e.g. gpt-4o-mini
 //   - Gemini:  https://generativelanguage.googleapis.com/v1beta/openai/  (free)
+//   - Groq:    https://api.groq.com/openai/v1                             (free)
 // Uses JSON mode (not forced tool calls) for the widest cross-provider support.
 
 const SYSTEM_PROMPT = `You are Ascend, a sharp and honest career-learning advisor. Given a user profile and a fixed catalog of courses, pick the 3 to 5 courses that genuinely fit this person best and explain why, in a builder and operator voice with no marketing fluff.
@@ -71,10 +72,10 @@ function parsePicks(content: string): AIPick[] {
 
 export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
   const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_BASE_URL || undefined,
+    apiKey: process.env.AI_API_KEY,
+    baseURL: process.env.AI_BASE_URL || undefined,
   });
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const model = process.env.AI_MODEL ?? "gpt-4o-mini";
 
   const messages = [
     {

@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   // Use the AI recommender when a key is configured. Any failure (no quota,
   // timeout, bad output) degrades to the deterministic scorer so the user
   // still gets a real, input-driven shortlist instead of an error.
-  if (process.env.OPENAI_API_KEY) {
+  if (process.env.AI_API_KEY) {
     try {
       const recommendations = await recommendAI(profile);
       return Response.json({ recommendations, engine: "ai" });
