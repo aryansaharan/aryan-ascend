@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, ExternalLink, Loader2 } from "lucide-react";
 import { useProfile } from "@/lib/store";
-import { recommend, type Profile, type Recommendation } from "@/lib/recommend";
+import { type Profile, type Recommendation } from "@/lib/recommend";
+import { getRecommendations } from "@/lib/recommend-client";
 import { COURSES } from "@/lib/courses";
 import { SaveSessionStub } from "@/components/SaveSessionStub";
 
@@ -24,6 +25,7 @@ export default function Recommendations() {
   const router = useRouter();
   const [profile, , profileReady] = useProfile();
   const [recs, setRecs] = useState<Recommendation[] | null>(null);
+  const [engine, setEngine] = useState<"ai" | "deterministic" | null>(null);
   const [loading, setLoading] = useState(true);
   const [termIndex, setTermIndex] = useState(0);
 
@@ -46,9 +48,10 @@ export default function Recommendations() {
       return;
     }
     let active = true;
-    recommend(profile as Profile).then((r) => {
+    getRecommendations(profile as Profile).then((r) => {
       if (active) {
-        setRecs(r);
+        setRecs(r.recommendations);
+        setEngine(r.engine);
         setLoading(false);
       }
     });
@@ -99,6 +102,13 @@ export default function Recommendations() {
             A short list, chosen against your role, level, time, and goal.
             Each card shows why it fits you.
           </motion.p>
+          {!loading && engine && (
+            <div className="mt-3 mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
+              {engine === "ai"
+                ? "// Ranked by AI from your answers"
+                : "// Ranked by Ascend's matching engine"}
+            </div>
+          )}
         </section>
 
         <section className="mt-8 mb-8">

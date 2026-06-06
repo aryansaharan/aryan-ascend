@@ -7,11 +7,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check, ExternalLink, Loader2, Star } from "lucide-react";
 import { useProfile } from "@/lib/store";
 import {
-  recommend,
   syntheticReviews,
   type Profile,
   type Recommendation,
 } from "@/lib/recommend";
+import { getRecommendations } from "@/lib/recommend-client";
 import { SaveSessionStub } from "@/components/SaveSessionStub";
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
@@ -37,8 +37,8 @@ export default function Compare() {
       return;
     }
     let active = true;
-    recommend(profile as Profile).then((r) => {
-      if (active) setRecs(r);
+    getRecommendations(profile as Profile).then((r) => {
+      if (active) setRecs(r.recommendations);
     });
     return () => {
       active = false;

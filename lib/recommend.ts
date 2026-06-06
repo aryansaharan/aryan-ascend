@@ -275,7 +275,7 @@ const TRACK_TO_CATEGORY: Record<string, string> = {
   researcher: "Design & UX",
 };
 
-function deriveCategory(course: Course): string {
+export function deriveCategory(course: Course): string {
   for (const track of course.tracks) {
     if (TRACK_TO_CATEGORY[track]) return TRACK_TO_CATEGORY[track];
   }
@@ -415,6 +415,12 @@ function buildRationale(
 
 function parseTime(t: Profile["timePerWeek"]): number {
   return { "<2": 1, "2-5": 3, "5-10": 7, "10+": 12 }[t];
+}
+
+// Exported so the AI recommender derives the same weekly-hours and
+// weeks-to-finish math as the deterministic path, keeping the cards consistent.
+export function weeklyHoursFor(profile: Profile): number {
+  return parseTime(profile.timePerWeek);
 }
 
 function capitalize(s: string) {
