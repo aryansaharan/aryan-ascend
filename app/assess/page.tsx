@@ -154,6 +154,7 @@ export default function Assess() {
         <header className="py-5 flex items-center justify-between">
           <button
             onClick={back}
+            aria-label={stepIdx === 0 ? "Back to home" : "Previous question"}
             className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -218,6 +219,7 @@ export default function Assess() {
                       return (
                         <motion.button
                           key={o.value}
+                          aria-pressed={selected}
                           onClick={() =>
                             setProfile({ [step.id]: o.value } as Partial<Profile>)
                           }
@@ -275,17 +277,22 @@ export default function Assess() {
                     {step.options!.map((o) => {
                       const arr = (profile.interests as string[]) ?? [];
                       const selected = arr.includes(o.value);
+                      const atCap = arr.length >= 3 && !selected;
                       return (
                         <motion.button
                           key={o.value}
+                          aria-pressed={selected}
+                          disabled={atCap}
                           onClick={() => toggleMulti(o.value)}
-                          whileHover={{ y: -1 }}
-                          whileTap={{ scale: 0.94 }}
+                          whileHover={atCap ? undefined : { y: -1 }}
+                          whileTap={atCap ? undefined : { scale: 0.94 }}
                           transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                          className={`rounded-full px-3.5 py-2 text-sm border ${
+                          className={`rounded-full px-3.5 py-2 text-sm border transition-opacity ${
                             selected
                               ? "bg-foreground text-accent-fg border-foreground"
-                              : "bg-card text-foreground border-border hover:border-foreground/30"
+                              : atCap
+                                ? "bg-card text-muted border-border opacity-40 cursor-not-allowed"
+                                : "bg-card text-foreground border-border hover:border-foreground/30"
                           }`}
                         >
                           {o.label}

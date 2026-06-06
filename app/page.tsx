@@ -7,6 +7,7 @@ import {
   useMotionValue,
   useTransform,
   animate,
+  useReducedMotion,
 } from "framer-motion";
 import { ArrowRight, Sparkles, Star } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -14,6 +15,7 @@ import { Logo } from "@/components/Logo";
 const easeOut = [0.16, 1, 0.3, 1] as const;
 
 export default function Landing() {
+  const reduced = useReducedMotion();
   return (
     <main className="relative min-h-screen bg-background overflow-x-clip">
       {/* Soft warm page-level glow */}
@@ -114,12 +116,12 @@ export default function Landing() {
                   Start Your Guided Session
                   <motion.span
                     className="inline-flex"
-                    animate={{ x: [0, 3, 0] }}
-                    transition={{
-                      duration: 1.8,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
+                    animate={reduced ? undefined : { x: [0, 3, 0] }}
+                    transition={
+                      reduced
+                        ? undefined
+                        : { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+                    }
                   >
                     <ArrowRight className="w-4 h-4" />
                   </motion.span>
@@ -388,9 +390,14 @@ function Stat({
   const [display, setDisplay] = useState(numberText ?? "0");
   const count = useMotionValue(0);
   const rounded = useTransform(count, (v) => Math.round(v));
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     if (typeof number !== "number") return;
+    if (reduced) {
+      setDisplay(`${number}${suffix ?? ""}`);
+      return;
+    }
     const unsubscribe = rounded.on("change", (v) =>
       setDisplay(`${v}${suffix ?? ""}`),
     );
@@ -403,7 +410,7 @@ function Stat({
       unsubscribe();
       controls.stop();
     };
-  }, [number, suffix, count, rounded]);
+  }, [number, suffix, count, rounded, reduced]);
 
   return (
     <motion.div

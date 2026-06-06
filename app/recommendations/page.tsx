@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowRight, ExternalLink, Loader2 } from "lucide-react";
 import { useProfile } from "@/lib/store";
 import { type Profile, type Recommendation } from "@/lib/recommend";
@@ -28,6 +28,7 @@ export default function Recommendations() {
   const [engine, setEngine] = useState<"ai" | "deterministic" | null>(null);
   const [loading, setLoading] = useState(true);
   const [termIndex, setTermIndex] = useState(0);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     if (!profileReady) return;
@@ -61,12 +62,12 @@ export default function Recommendations() {
   }, [profile, profileReady, router]);
 
   useEffect(() => {
-    if (!loading) return;
+    if (!loading || reduced) return;
     const id = window.setInterval(() => {
       setTermIndex((i) => (i + 1) % ANALYSIS_TERMS.length);
     }, 600);
     return () => window.clearInterval(id);
-  }, [loading]);
+  }, [loading, reduced]);
 
   return (
     <main className="min-h-screen bg-background flex flex-col items-center">
@@ -123,7 +124,7 @@ export default function Recommendations() {
               >
                 <div className="flex items-center gap-2.5 text-foreground text-sm">
                   <Loader2 className="w-4 h-4 animate-spin text-muted" />
-                  Analyzing {COURSES.length} courses against your profile
+                  Matching {COURSES.length} courses to your profile
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted">
                   <span>Checking:</span>
@@ -269,6 +270,7 @@ function RecCard({ rec }: { rec: Recommendation }) {
               className="mono-label text-[9px] uppercase tracking-[0.16em] text-muted-2 bg-card-alt rounded-full px-2.5 py-1 cursor-default"
             >
               {n.label}
+              <span className="sr-only">: {n.text}</span>
             </li>
           ))}
         </ul>

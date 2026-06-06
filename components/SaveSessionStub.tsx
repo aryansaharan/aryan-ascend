@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**
@@ -14,6 +14,7 @@ export function SaveSessionStub({
   tooltipPosition?: "top" | "bottom";
 }) {
   const [shown, setShown] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tooltipPositionClass =
     tooltipPosition === "top"
@@ -25,7 +26,8 @@ export function SaveSessionStub({
       <button
         onClick={() => {
           setShown(true);
-          setTimeout(() => setShown(false), 3000);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => setShown(false), 3000);
         }}
         className="text-xs text-muted hover:text-foreground transition-colors"
       >
@@ -34,6 +36,8 @@ export function SaveSessionStub({
       <AnimatePresence>
         {shown && (
           <motion.div
+            role="status"
+            aria-live="polite"
             initial={{ opacity: 0, y: tooltipPosition === "top" ? -4 : 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: tooltipPosition === "top" ? -4 : 4 }}

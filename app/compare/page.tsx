@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowLeft, Check, ExternalLink, Loader2, Star } from "lucide-react";
 import { useProfile } from "@/lib/store";
 import {
@@ -16,8 +16,6 @@ import { SaveSessionStub } from "@/components/SaveSessionStub";
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
 
-const COMPARE_TERMS = ["Side by side", "Hours per week", "Peer outcomes"];
-
 type ReviewWithCourse = ReturnType<typeof syntheticReviews>[number] & {
   courseId: string;
   courseTitle: string;
@@ -28,7 +26,7 @@ export default function Compare() {
   const [profile, , profileReady] = useProfile();
   const [recs, setRecs] = useState<Recommendation[] | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
-  const [termIndex, setTermIndex] = useState(0);
+  const [engine, setEngine] = useState<"ai" | "deterministic" | null>(null);
 
   useEffect(() => {
     if (!profileReady) return;
@@ -50,20 +48,15 @@ export default function Compare() {
     }
     let active = true;
     getRecommendations(profile as Profile).then((r) => {
-      if (active) setRecs(r.recommendations);
+      if (active) {
+        setRecs(r.recommendations);
+        setEngine(r.engine);
+      }
     });
     return () => {
       active = false;
     };
   }, [profile, profileReady, router]);
-
-  useEffect(() => {
-    if (recs) return;
-    const id = window.setInterval(() => {
-      setTermIndex((i) => (i + 1) % COMPARE_TERMS.length);
-    }, 600);
-    return () => window.clearInterval(id);
-  }, [recs]);
 
   const top = useMemo(() => (recs ? recs.slice(0, 3) : []), [recs]);
 
@@ -128,21 +121,6 @@ export default function Compare() {
             <div className="flex items-center gap-2.5 text-foreground text-sm">
               <Loader2 className="w-4 h-4 animate-spin text-muted" />
               Lining up your top 3 picks
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted">
-              <span>Checking:</span>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={COMPARE_TERMS[termIndex]}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.2 }}
-                  className="text-foreground font-medium"
-                >
-                  {COMPARE_TERMS[termIndex]}
-                </motion.span>
-              </AnimatePresence>
             </div>
           </section>
         </div>
@@ -220,6 +198,13 @@ export default function Compare() {
             Three serious options, lined up. Pick the one that fits your week
             and your goal.
           </motion.p>
+          {engine && (
+            <div className="mt-3 mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
+              {engine === "ai"
+                ? "// Ranked by AI from your answers"
+                : "// Ranked by Ascend's matching engine"}
+            </div>
+          )}
         </section>
 
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -280,6 +265,7 @@ export default function Compare() {
                         className="mono-label text-[9px] uppercase tracking-[0.14em] text-muted-2 bg-card-alt rounded-full px-2 py-0.5 cursor-default"
                       >
                         {n.label}
+                        <span className="sr-only">: {n.text}</span>
                       </li>
                     ))}
                   </ul>
