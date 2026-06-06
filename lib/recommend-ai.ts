@@ -67,7 +67,7 @@ function parsePicks(content: string): AIPick[] {
     .replace(/```$/, "")
     .trim();
   const parsed = JSON.parse(cleaned) as { picks?: AIPick[] };
-  return parsed.picks ?? [];
+  return Array.isArray(parsed.picks) ? parsed.picks : [];
 }
 
 export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
@@ -92,41 +92,57 @@ export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
     },
   ];
 
-  // Try JSON mode, then retry without response_format on a 400. Some
-  // OpenAI-compatible providers reject that field; the prompt already demands
-  // a bare JSON object and parsePicks handles fences defensively.
-  let completion;
-  try {
-    completion = await client.chat.completions.create({
-      model,
-      response_format: { type: "json_object" },
-      messages,
-    });
-  } catch (err) {
-    if (err instanceof OpenAI.APIError && err.status === 400) {
-      completion = await client.chat.completions.create({ model, messages });
-    } else {
-      throw err;
+  // One model call: try JSON mode, retry without response_format on a 400
+  // (some OpenAI-compatible providers reject that field; the prompt already
+  // demands a bare JSON object and parsePicks handles fences defensively).
+  async function callOnce(): Promise<AIPick[]> {
+    let completion;
+    try {
+      completion = await client.chat.completions.create({
+        model,
+        response_format: { type: "json_object" },
+        messages,
+      });
+    } catch (err) {
+      if (err instanceof OpenAI.APIError && err.status === 400) {
+        completion = await client.chat.completions.create({ model, messages });
+      } else {
+        throw err;
+      }
     }
+    const content = completion.choices[0]?.message?.content ?? "";
+    if (!content) throw new Error("Model returned empty content");
+    return parsePicks(content);
   }
 
-  const content = completion.choices[0]?.message?.content ?? "";
-  if (!content) throw new Error("Model returned empty content");
+  // Models occasionally emit malformed JSON. Retry once on a parse error
+  // before giving up (the route then falls back to the deterministic scorer).
+  let picks: AIPick[];
+  try {
+    picks = await callOnce();
+  } catch (err) {
+    if (err instanceof SyntaxError) picks = await callOnce();
+    else throw err;
+  }
 
-  const picks = parsePicks(content);
   const byId = new Map(COURSES.map((c) => [c.id, c]));
   const weeklyHours = weeklyHoursFor(profile);
 
+  const seen = new Set<string>();
   const recs: Recommendation[] = [];
   for (const pick of picks) {
     const course = byId.get(pick.courseId);
-    if (!course) continue;
+    if (!course || seen.has(course.id)) continue;
+    seen.add(course.id);
     recs.push({
       course,
-      score: typeof pick.score === "number" ? pick.score : 0,
+      // Clamp to 0..100 so a stray model value cannot render as "Fit -12".
+      score: Number.isFinite(pick.score)
+        ? Math.max(0, Math.min(100, pick.score))
+        : 0,
       rationale: pick.whyThisFitsYou ?? "",
       fitNotes: Array.isArray(pick.signals)
-        ? pick.signals.filter((s) => s && s.label && s.text)
+        ? pick.signals.filter((s) => s && s.label && s.text).slice(0, 5)
         : [],
       category: deriveCategory(course),
       careerImpact: pick.careerImpact ?? "",

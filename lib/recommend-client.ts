@@ -51,11 +51,16 @@ export async function getRecommendations(
     };
   } catch {
     // Network or server failure: fall back to the local deterministic scorer
-    // so the flow never dead-ends.
-    result = {
-      recommendations: await recommend(profile),
-      engine: "deterministic",
-    };
+    // so the flow never dead-ends. Guard it too, so getRecommendations always
+    // resolves; a rejection here would hang the page on its loading spinner.
+    try {
+      result = {
+        recommendations: await recommend(profile),
+        engine: "deterministic",
+      };
+    } catch {
+      result = { recommendations: [], engine: "deterministic" };
+    }
   }
 
   if (typeof window !== "undefined") {

@@ -107,7 +107,6 @@ export default function Landing() {
                   onClick={() => {
                     if (typeof window !== "undefined") {
                       localStorage.removeItem("ascend.profile.v1");
-                      localStorage.removeItem("ascend.chosen.v1");
                     }
                   }}
                   className="relative group inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl py-3.5 px-6 font-medium text-[15px] shadow-[0_10px_30px_-12px_rgba(10,10,10,0.45)]"

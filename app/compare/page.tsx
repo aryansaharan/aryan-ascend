@@ -32,7 +32,19 @@ export default function Compare() {
 
   useEffect(() => {
     if (!profileReady) return;
-    if (!profile.currentRole) {
+    const required: (keyof Profile)[] = [
+      "currentRole",
+      "experience",
+      "goal",
+      "level",
+      "timePerWeek",
+      "interests",
+    ];
+    const ready = required.every((k) => {
+      const v = profile[k];
+      return v !== undefined && (Array.isArray(v) ? v.length > 0 : true);
+    });
+    if (!ready) {
       router.replace("/assess");
       return;
     }
@@ -131,6 +143,41 @@ export default function Compare() {
                   {COMPARE_TERMS[termIndex]}
                 </motion.span>
               </AnimatePresence>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+
+  if (recs.length === 0)
+    return (
+      <main className="min-h-screen bg-background flex flex-col items-center">
+        <div className="w-full max-w-6xl mx-auto flex flex-col min-h-screen px-6 sm:px-10 lg:px-16">
+          <header className="py-5 flex items-center justify-between">
+            <button
+              onClick={() => router.push("/recommendations")}
+              className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to picks
+            </button>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
+              Side-by-side
+            </div>
+          </header>
+          <section className="mt-8">
+            <div className="bg-card-alt rounded-2xl p-6">
+              <p className="text-foreground">
+                Nothing scored high enough to line up a comparison. A small
+                tweak to your interests or weekly time usually unlocks a
+                stronger shortlist.
+              </p>
+              <button
+                onClick={() => router.push("/assess")}
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:gap-2 transition-all"
+              >
+                Adjust answers
+              </button>
             </div>
           </section>
         </div>
