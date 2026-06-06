@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { COURSES } from "./courses";
 import {
   deriveCategory,
@@ -7,8 +7,11 @@ import {
   type Recommendation,
 } from "./recommend";
 
-// Server-only. Imported only by app/api/recommend/route.ts so the Anthropic
-// SDK and the API key never reach the client bundle.
+// Server-only. Imported only by app/api/recommend/route.ts so the OpenAI SDK
+// and the API key never reach the client bundle.
+//
+// Provider-flexible: uses the OpenAI client, but OPENAI_BASE_URL can point it
+// at any OpenAI-compatible endpoint (Groq, Gemini, OpenRouter, ...).
 
 const SYSTEM_PROMPT = `You are Ascend, a sharp and honest career-learning advisor. Given a user profile and a fixed catalog of courses, pick the 3 to 5 courses that genuinely fit this person best and explain why, in a builder and operator voice with no marketing fluff.
 
@@ -39,63 +42,53 @@ type AIPick = {
   signals: { label: string; text: string }[];
 };
 
-const RECOMMENDER_TOOL: Anthropic.Tool = {
-  name: "submit_recommendations",
-  description:
-    "Submit the 3 to 5 best-fit course recommendations for this user.",
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      picks: {
-        type: "array",
-        description: "The 3 to 5 best-fit courses, strongest match first.",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            courseId: {
-              type: "string",
-              description: "Exact id from the catalog.",
-            },
-            score: {
-              type: "number",
-              description: "Overall fit from 0 to 100.",
-            },
-            whyThisFitsYou: { type: "string" },
-            careerImpact: { type: "string" },
-            prerequisites: { type: "string" },
-            signals: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  label: { type: "string" },
-                  text: { type: "string" },
-                },
-                required: ["label", "text"],
+// JSON Schema for the function the model is forced to call.
+const RECOMMENDER_PARAMETERS = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    picks: {
+      type: "array",
+      description: "The 3 to 5 best-fit courses, strongest match first.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          courseId: { type: "string", description: "Exact id from the catalog." },
+          score: { type: "number", description: "Overall fit from 0 to 100." },
+          whyThisFitsYou: { type: "string" },
+          careerImpact: { type: "string" },
+          prerequisites: { type: "string" },
+          signals: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                label: { type: "string" },
+                text: { type: "string" },
               },
+              required: ["label", "text"],
             },
           },
-          required: [
-            "courseId",
-            "score",
-            "whyThisFitsYou",
-            "careerImpact",
-            "prerequisites",
-            "signals",
-          ],
         },
+        required: [
+          "courseId",
+          "score",
+          "whyThisFitsYou",
+          "careerImpact",
+          "prerequisites",
+          "signals",
+        ],
       },
     },
-    required: ["picks"],
   },
+  required: ["picks"],
 };
 
-// The catalog is identical across requests, so it is built once and cached on
-// the request (cache_control below) for cheap repeat calls.
-const catalogJson = JSON.stringify(
+// The catalog is identical across requests; built once. OpenAI auto-caches the
+// stable system prefix server-side, so repeat calls are cheaper for free.
+const catalogText = JSON.stringify(
   COURSES.map((c) => ({
     id: c.id,
     title: c.title,
@@ -109,36 +102,48 @@ const catalogJson = JSON.stringify(
 );
 
 export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const model = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-8";
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: process.env.OPENAI_BASE_URL || undefined,
+  });
+  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
-  const response = await client.messages.create({
+  const completion = await client.chat.completions.create({
     model,
-    max_tokens: 4096,
-    system: [
-      { type: "text", text: SYSTEM_PROMPT },
-      {
-        type: "text",
-        text: `Course catalog (JSON array). Recommend only from these, by exact id:\n${catalogJson}`,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    tools: [RECOMMENDER_TOOL],
-    tool_choice: { type: "tool", name: "submit_recommendations" },
     messages: [
+      {
+        role: "system",
+        content: `${SYSTEM_PROMPT}\n\nCourse catalog (JSON array). Recommend only from these, by exact id:\n${catalogText}`,
+      },
       {
         role: "user",
         content: `User profile (JSON):\n${JSON.stringify(profile)}\n\nPick the 3 to 5 courses that genuinely fit this person best, strongest match first.`,
       },
     ],
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "submit_recommendations",
+          description:
+            "Submit the 3 to 5 best-fit course recommendations for this user.",
+          parameters: RECOMMENDER_PARAMETERS,
+        },
+      },
+    ],
+    tool_choice: {
+      type: "function",
+      function: { name: "submit_recommendations" },
+    },
   });
 
-  const toolUse = response.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
-  );
-  if (!toolUse) throw new Error("Claude returned no recommendations");
+  const call = completion.choices[0]?.message?.tool_calls?.[0];
+  if (!call || call.type !== "function") {
+    throw new Error("Model returned no recommendations");
+  }
 
-  const picks = (toolUse.input as { picks?: AIPick[] }).picks ?? [];
+  const picks =
+    (JSON.parse(call.function.arguments) as { picks?: AIPick[] }).picks ?? [];
   const byId = new Map(COURSES.map((c) => [c.id, c]));
   const weeklyHours = weeklyHoursFor(profile);
 
@@ -165,6 +170,6 @@ export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
     });
   }
 
-  if (recs.length === 0) throw new Error("Claude returned no valid course ids");
+  if (recs.length === 0) throw new Error("Model returned no valid course ids");
   return recs.slice(0, 5);
 }

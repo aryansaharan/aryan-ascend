@@ -13,10 +13,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  // Use Claude when a key is configured. Any failure (no quota, timeout, bad
-  // output) degrades to the deterministic scorer so the user still gets a
-  // real, input-driven shortlist instead of an error.
-  if (process.env.ANTHROPIC_API_KEY) {
+  // Use the AI recommender when a key is configured. Any failure (no quota,
+  // timeout, bad output) degrades to the deterministic scorer so the user
+  // still gets a real, input-driven shortlist instead of an error.
+  if (process.env.OPENAI_API_KEY) {
     try {
       const recommendations = await recommendAI(profile);
       return Response.json({ recommendations, engine: "ai" });
