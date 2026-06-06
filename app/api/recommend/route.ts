@@ -16,15 +16,20 @@ export async function POST(request: Request) {
   // Use the AI recommender when a key is configured. Any failure (no quota,
   // timeout, bad output) degrades to the deterministic scorer so the user
   // still gets a real, input-driven shortlist instead of an error.
+  let aiError: string | undefined;
   if (process.env.OPENAI_API_KEY) {
     try {
       const recommendations = await recommendAI(profile);
       return Response.json({ recommendations, engine: "ai" });
     } catch (err) {
+      aiError =
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       console.error("AI recommender failed, using deterministic fallback:", err);
     }
+  } else {
+    aiError = "OPENAI_API_KEY is not set on this deployment";
   }
 
   const recommendations = await recommend(profile);
-  return Response.json({ recommendations, engine: "deterministic" });
+  return Response.json({ recommendations, engine: "deterministic", aiError });
 }
