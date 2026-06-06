@@ -7,11 +7,15 @@ import {
   type Recommendation,
 } from "./recommend";
 
-// Server-only. Imported only by app/api/recommend/route.ts so the OpenAI SDK
-// and the API key never reach the client bundle.
+// Server-only. Imported only by app/api/recommend/route.ts so the SDK and the
+// API key never reach the client bundle.
 //
 // Provider-flexible: uses the OpenAI client, but OPENAI_BASE_URL can point it
-// at any OpenAI-compatible endpoint (Groq, Gemini, OpenRouter, ...).
+// at any OpenAI-compatible endpoint. Works as-is with:
+//   - OpenAI:  (no base url)             model e.g. gpt-4o-mini
+//   - Groq:    https://api.groq.com/openai/v1                 (free)
+//   - Gemini:  https://generativelanguage.googleapis.com/v1beta/openai/  (free)
+// Uses JSON mode (not forced tool calls) for the widest cross-provider support.
 
 const SYSTEM_PROMPT = `You are Ascend, a sharp and honest career-learning advisor. Given a user profile and a fixed catalog of courses, pick the 3 to 5 courses that genuinely fit this person best and explain why, in a builder and operator voice with no marketing fluff.
 
@@ -21,12 +25,9 @@ How to choose:
 - Be honest. If a course runs long relative to their weekly time, or sits a level above or below them, say so plainly. Do not pretend everything is a perfect fit.
 - Only one pick should read as the single strongest match.
 
-For each pick:
-- score: 0 to 100, reflecting overall fit.
-- whyThisFitsYou: 2 to 3 sentences, advisor voice, specific to THIS course and THIS person. Name the concrete reason (their track, level, weekly time, goal, or role).
-- careerImpact: one sentence on the concrete career outcome, tied to the course's actual skills.
-- prerequisites: one short line on what they need before starting, or "None. This is your start." for true entry points.
-- signals: 2 to 5 short tags showing what drove the pick. label is 1 to 2 words (for example "Track fit", "Level", "Time", "Goal", "Experience", "Your role"); text is one honest sentence.
+Respond with ONLY a JSON object (no prose, no markdown code fences) of this exact shape:
+{"picks":[{"courseId":"<exact id from the catalog>","score":<number 0 to 100>,"whyThisFitsYou":"<2 to 3 sentences, advisor voice, specific to this course and this person>","careerImpact":"<one sentence on the concrete career outcome, tied to the course's actual skills>","prerequisites":"<one short line, or 'None. This is your start.' for true entry points>","signals":[{"label":"<1 to 2 words, e.g. Track fit, Level, Time, Goal, Experience, Your role>","text":"<one honest sentence>"}]}]}
+Include 3 to 5 picks, strongest match first, each with 2 to 5 signals.
 
 Writing rules (strict):
 - Do NOT use em dashes or en dashes anywhere. Use periods or commas instead.
@@ -42,52 +43,8 @@ type AIPick = {
   signals: { label: string; text: string }[];
 };
 
-// JSON Schema for the function the model is forced to call.
-const RECOMMENDER_PARAMETERS = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    picks: {
-      type: "array",
-      description: "The 3 to 5 best-fit courses, strongest match first.",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          courseId: { type: "string", description: "Exact id from the catalog." },
-          score: { type: "number", description: "Overall fit from 0 to 100." },
-          whyThisFitsYou: { type: "string" },
-          careerImpact: { type: "string" },
-          prerequisites: { type: "string" },
-          signals: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                label: { type: "string" },
-                text: { type: "string" },
-              },
-              required: ["label", "text"],
-            },
-          },
-        },
-        required: [
-          "courseId",
-          "score",
-          "whyThisFitsYou",
-          "careerImpact",
-          "prerequisites",
-          "signals",
-        ],
-      },
-    },
-  },
-  required: ["picks"],
-};
-
-// The catalog is identical across requests; built once. OpenAI auto-caches the
-// stable system prefix server-side, so repeat calls are cheaper for free.
+// The catalog is identical across requests; built once. OpenAI-compatible
+// providers cache the stable prefix server-side where supported.
 const catalogText = JSON.stringify(
   COURSES.map((c) => ({
     id: c.id,
@@ -101,6 +58,17 @@ const catalogText = JSON.stringify(
   })),
 );
 
+function parsePicks(content: string): AIPick[] {
+  // Strip accidental markdown fences some models add, then parse.
+  const cleaned = content
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
+  const parsed = JSON.parse(cleaned) as { picks?: AIPick[] };
+  return parsed.picks ?? [];
+}
+
 export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -110,6 +78,7 @@ export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
 
   const completion = await client.chat.completions.create({
     model,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
@@ -117,33 +86,15 @@ export async function recommendAI(profile: Profile): Promise<Recommendation[]> {
       },
       {
         role: "user",
-        content: `User profile (JSON):\n${JSON.stringify(profile)}\n\nPick the 3 to 5 courses that genuinely fit this person best, strongest match first.`,
+        content: `User profile (JSON):\n${JSON.stringify(profile)}\n\nReturn the JSON object with the 3 to 5 courses that genuinely fit this person best, strongest match first.`,
       },
     ],
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "submit_recommendations",
-          description:
-            "Submit the 3 to 5 best-fit course recommendations for this user.",
-          parameters: RECOMMENDER_PARAMETERS,
-        },
-      },
-    ],
-    tool_choice: {
-      type: "function",
-      function: { name: "submit_recommendations" },
-    },
   });
 
-  const call = completion.choices[0]?.message?.tool_calls?.[0];
-  if (!call || call.type !== "function") {
-    throw new Error("Model returned no recommendations");
-  }
+  const content = completion.choices[0]?.message?.content ?? "";
+  if (!content) throw new Error("Model returned empty content");
 
-  const picks =
-    (JSON.parse(call.function.arguments) as { picks?: AIPick[] }).picks ?? [];
+  const picks = parsePicks(content);
   const byId = new Map(COURSES.map((c) => [c.id, c]));
   const weeklyHours = weeklyHoursFor(profile);
 
