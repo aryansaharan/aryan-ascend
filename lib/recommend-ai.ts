@@ -65,6 +65,11 @@ export function streamPicks(profile: Profile) {
     model: model(),
     schema: picksSchema,
     temperature: 0.4,
+    // On the free tier a 429 is the common failure; retrying 3x just triples
+    // quota burn and (honoring the provider's retry-after) can hang the user for
+    // up to a minute before the client falls back. One retry is the better
+    // balance: it rides out a transient blip without hammering the quota.
+    maxRetries: 1,
     // streamObject swallows provider errors by default (they become a clean
     // stream close). Log them so a failing key/quota is visible server-side.
     // The client recovers to the deterministic scorer when no usable picks land.

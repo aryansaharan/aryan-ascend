@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     model: model(),
     schema: planSchema,
     temperature: 0.4,
+    maxRetries: 1,
     onError: ({ error }) => console.error("plan streamObject error:", error),
     system: SYSTEM,
     prompt: `User profile (JSON):\n${JSON.stringify(

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
   const result = streamText({
     model: model(),
     temperature: 0.5,
+    maxRetries: 1,
     onError: ({ error }) => console.error("advise streamText error:", error),
     system: `${SYSTEM}\n\nFull course catalog (JSON):\n${catalogText}`,
     prompt: `User profile (JSON):\n${JSON.stringify(body.profile ?? {})}\n\nThe shortlist they were just shown:\n${
