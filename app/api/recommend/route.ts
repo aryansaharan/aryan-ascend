@@ -1,9 +1,53 @@
 import { recommend, type Profile } from "@/lib/recommend";
-import { recommendAI } from "@/lib/recommend-ai";
+import { aiEnabled, streamPicks } from "@/lib/recommend-ai";
 
 export const runtime = "nodejs";
-// Allow headroom for retrying transient provider 503/429s before falling back.
+// Headroom for the model to stream a full response.
 export const maxDuration = 45;
+
+// Builds the same {readBack, picks} shape the model streams, so the client's
+// useObject hook parses both engines identically. Used when no AI key is
+// configured, or if the model call fails before streaming starts.
+function deterministicReadBack(profile: Profile): string {
+  const role = profile.currentRole?.trim();
+  const goal = {
+    promotion: "aiming for a promotion",
+    "switch-field": "switching fields",
+    salary: "growing your earning power",
+    "deeper-craft": "going deeper on your craft",
+    leadership: "moving into leadership",
+  }[profile.goal];
+  const time = {
+    "<2": "under 2 hours a week",
+    "2-5": "2 to 5 hours a week",
+    "5-10": "5 to 10 hours a week",
+    "10+": "10+ hours a week",
+  }[profile.timePerWeek];
+  const lead = role ? `You're ${role}` : `You're ${profile.level}`;
+  return `${lead}, ${goal}, with ${time} to invest. Here's the shortlist that fits.`;
+}
+
+async function deterministicResponse(profile: Profile): Promise<Response> {
+  const recs = await recommend(profile);
+  const picks = recs.map((r) => ({
+    courseId: r.course.id,
+    score: r.score,
+    whyThisFitsYou: r.whyThisFitsYou,
+    careerImpact: r.careerImpact,
+    prerequisites: r.prerequisites,
+    signals: r.fitNotes,
+  }));
+  const body = JSON.stringify({
+    readBack: deterministicReadBack(profile),
+    picks,
+  });
+  return new Response(body, {
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "x-ascend-engine": "deterministic",
+    },
+  });
+}
 
 export async function POST(request: Request) {
   let profile: Profile;
@@ -15,25 +59,30 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  // Use the AI recommender when a key is configured. Any failure (no quota,
-  // timeout, bad output) degrades to the deterministic scorer so the user
-  // still gets a real, input-driven shortlist instead of an error.
-  if (process.env.AI_API_KEY) {
+  // Stream the live model when a key is configured. streamObject returns
+  // synchronously and streams asynchronously; a setup error here (bad config)
+  // drops to the deterministic shortlist. A mid-stream failure surfaces to the
+  // client, which then falls back locally.
+  if (aiEnabled()) {
     try {
-      const recommendations = await recommendAI(profile);
-      return Response.json({ recommendations, engine: "ai" });
+      const result = streamPicks(profile);
+      return result.toTextStreamResponse({
+        headers: { "x-ascend-engine": "ai" },
+      });
     } catch (err) {
-      console.error("AI recommender failed, using deterministic fallback:", err);
+      console.error("AI stream setup failed, using deterministic fallback:", err);
     }
   }
 
-  // Never 500: even if the deterministic scorer throws (e.g. a malformed
-  // profile), return an empty list so the client renders its empty state.
   try {
-    const recommendations = await recommend(profile);
-    return Response.json({ recommendations, engine: "deterministic" });
+    return await deterministicResponse(profile);
   } catch (err) {
     console.error("Deterministic recommender failed:", err);
-    return Response.json({ recommendations: [], engine: "deterministic" });
+    return new Response(JSON.stringify({ readBack: "", picks: [] }), {
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "x-ascend-engine": "deterministic",
+      },
+    });
   }
 }

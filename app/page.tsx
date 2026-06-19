@@ -143,7 +143,7 @@ export default function Landing() {
             <Feature
               num="01"
               title="Guided Assessment"
-              body="Six short questions about your role, goals, and time."
+              body="Six short questions about your role, goal, level, and time."
             />
             <Feature
               num="02"
@@ -218,7 +218,7 @@ export default function Landing() {
             <Step
               index="01"
               title="Assess"
-              body="Six short questions about your role, goal, and time."
+              body="Six short questions about your role, goal, level, and time."
               scaleLabel="Hundreds of options"
               progress={1.0}
             />

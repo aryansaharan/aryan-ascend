@@ -91,9 +91,6 @@ function experienceLabel(e: Profile["experience"]): string {
  * later: pass profile + COURSES, ask for top-5 with reasoning.
  */
 export async function recommend(profile: Profile): Promise<Recommendation[]> {
-  // Simulate latency so the UI's loading state has somewhere to live.
-  await new Promise((r) => setTimeout(r, 900));
-
   const weeklyHours = parseTime(profile.timePerWeek);
   const roleTracks = tracksFromRole(profile.currentRole);
   const seniority = SENIORITY[profile.experience];
@@ -208,7 +205,9 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
     }
 
     // Role fit: connect the free-text current role to relevant tracks.
-    if (roleTracks.size > 0 && c.tracks.some((t) => roleTracks.has(t))) {
+    const roleFit =
+      roleTracks.size > 0 && c.tracks.some((t) => roleTracks.has(t));
+    if (roleFit) {
       score += 8;
       fitNotes.push({
         label: "Your role",
@@ -216,12 +215,21 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
       });
     }
 
-    return { course: c, score, fitNotes, weeksToFinish };
+    // Relevance gate: a course only belongs on the shortlist if it actually
+    // serves what the user asked for (an interest track, their goal, or their
+    // role). Level + time fit alone are NOT enough; that is what used to let an
+    // off-topic beginner short course (e.g. Tic-Tac-Toe for a salesperson)
+    // clear the bar and pad the list.
+    const relevant = trackOverlap > 0 || goalMatch || roleFit;
+
+    return { course: c, score, fitNotes, weeksToFinish, relevant };
   });
 
-  // PDF spec: "narrows hundreds of course options down to 3 to 5 personalized recommendations"
+  // Narrow to the genuinely-relevant courses, strongest first. Returns fewer
+  // than 5 (even 1 or 0) rather than padding with filler the user didn't ask
+  // for; the UI handles a short or empty shortlist honestly.
   const top = scored
-    .filter((s) => s.score > 30)
+    .filter((s) => s.score > 30 && s.relevant)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 

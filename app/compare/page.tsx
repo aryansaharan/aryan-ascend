@@ -4,7 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, ExternalLink, Loader2, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ExternalLink,
+  Loader2,
+  Star,
+} from "lucide-react";
 import { useProfile } from "@/lib/store";
 import {
   syntheticReviews,
@@ -12,6 +19,7 @@ import {
   type Recommendation,
 } from "@/lib/recommend";
 import { getRecommendations } from "@/lib/recommend-client";
+import { encodePlan } from "@/lib/plan-link";
 import { SaveSessionStub } from "@/components/SaveSessionStub";
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
@@ -146,8 +154,8 @@ export default function Compare() {
           <section className="mt-8">
             <div className="bg-card-alt rounded-2xl p-6">
               <p className="text-foreground">
-                Nothing scored high enough to line up a comparison. A small
-                tweak to your interests or weekly time usually unlocks a
+                Nothing matched strongly enough to line up a comparison. A
+                small tweak to your interests or weekly time usually unlocks a
                 stronger shortlist.
               </p>
               <button
@@ -392,17 +400,27 @@ export default function Compare() {
             transition={{ duration: 0.5, ease: easeOut }}
             className="mt-12 flex flex-col items-center gap-3"
           >
+            <Link
+              href={`/plan?d=${encodePlan({
+                profile: profile as Profile,
+                courseId: chosenRec.course.id,
+              })}`}
+              className="inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl px-7 py-3.5 font-medium text-[15px] hover:gap-3 transition-all"
+            >
+              Build my learning plan
+              <ArrowRight className="w-4 h-4" />
+            </Link>
             <a
               href={chosenRec.course.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl px-7 py-3.5 font-medium text-[15px] hover:gap-3 transition-all"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-foreground transition-colors"
             >
-              Open chosen course
-              <ExternalLink className="w-4 h-4" />
+              or open the course directly
+              <ExternalLink className="w-3 h-3" />
             </a>
             <div className="text-xs text-muted italic">
-              Decision made. Take the first step in the next 48 hours.
+              Decision made. Your plan turns it into a first step you can take in the next 48 hours.
             </div>
           </motion.div>
         )}
