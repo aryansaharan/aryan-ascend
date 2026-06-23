@@ -37,6 +37,12 @@ const ROLE_KEYWORDS: { re: RegExp; tracks: string[] }[] = [
   { re: /growth|demand gen/, tracks: ["growth"] },
   { re: /sales|account executive|\bae\b|\bsdr\b|\bbdr\b|business development/, tracks: ["sales"] },
   { re: /customer success|\bcsm\b|account manager|onboarding specialist/, tracks: ["customer-success"] },
+  { re: /financial analyst|\bfp&a\b|accountant|accounting|investment|equity research|\bib\b|\bfinance\b|treasury/, tracks: ["finance"] },
+  { re: /\bhr\b|human resources|recruit|talent acquisition|people ops|hrbp|sourcer|people analytics/, tracks: ["hr"] },
+  { re: /project manager|program manager|scrum master|delivery (manager|lead)|\bpmo\b|agile coach/, tracks: ["project-management"] },
+  { re: /consultant|consulting|strategy analyst|management consult|business strategy/, tracks: ["consulting"] },
+  { re: /copywriter|content writer|technical writer|content strategist|communications|\bcomms\b/, tracks: ["content-writing", "marketing"] },
+  { re: /security analyst|cyber\s?security|\bsoc\b|penetration test|pentest|infosec|ethical hack|\bgrc\b/, tracks: ["cybersecurity"] },
   { re: /\bmanager\b|\blead\b|head of|director|\bvp\b|principal/, tracks: ["em", "staff-engineer"] },
 ];
 
@@ -156,11 +162,11 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
 
     // Goal alignment
     const goalSkills: Record<Profile["goal"], string[]> = {
-      promotion: ["system-design", "leadership", "technical-leadership", "growth-strategy", "marketing-strategy"],
-      "switch-field": ["sql", "python", "react", "frontend", "data-analyst", "marketing-fundamentals", "sales-fundamentals", "customer-success", "content-marketing"],
-      salary: ["aws", "kubernetes", "ml", "ai-engineering", "growth-marketing", "enterprise-sales", "saas-sales"],
-      "deeper-craft": ["design-thinking", "ux", "product-discovery", "copywriting", "positioning", "csm-framework", "experimentation"],
-      leadership: ["management", "leadership", "1-on-1s", "staff-engineer", "go-to-market", "marketing-strategy", "cs-leadership"],
+      promotion: ["system-design", "leadership", "technical-leadership", "growth-strategy", "marketing-strategy", "stakeholder-management", "corporate-strategy", "performance-management"],
+      "switch-field": ["sql", "python", "react", "frontend", "data-analyst", "marketing-fundamentals", "sales-fundamentals", "customer-success", "content-marketing", "financial-accounting", "hr-fundamentals", "project-management", "business-strategy", "technical-writing", "security-principles", "talent-acquisition"],
+      salary: ["aws", "kubernetes", "ml", "ai-engineering", "growth-marketing", "enterprise-sales", "saas-sales", "financial-modeling", "penetration-testing", "people-analytics"],
+      "deeper-craft": ["design-thinking", "ux", "product-discovery", "copywriting", "positioning", "csm-framework", "experimentation", "case-interview", "conversion-copywriting", "scrum"],
+      leadership: ["management", "leadership", "1-on-1s", "staff-engineer", "go-to-market", "marketing-strategy", "cs-leadership", "hr-strategy", "people-leadership"],
     };
     const goalMatch = c.skills.some((s) =>
       goalSkills[profile.goal].includes(s),
@@ -215,12 +221,13 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
       });
     }
 
-    // Relevance gate: a course only belongs on the shortlist if it actually
-    // serves what the user asked for (an interest track, their goal, or their
-    // role). Level + time fit alone are NOT enough; that is what used to let an
-    // off-topic beginner short course (e.g. Tic-Tac-Toe for a salesperson)
-    // clear the bar and pad the list.
-    const relevant = trackOverlap > 0 || goalMatch || roleFit;
+    // Relevance gate: a course only belongs on the shortlist if it serves the
+    // user's chosen tracks or the role they typed. Goal match is deliberately
+    // NOT enough on its own: the goal skill lists are broad (e.g. "switch-field"
+    // spans react, sql, content-marketing), so admitting on goal alone would let
+    // a React tutorial pad a finance shortlist. Goal still boosts the SCORE of
+    // on-track courses below; it just can't admit an off-track one.
+    const relevant = trackOverlap > 0 || roleFit;
 
     return { course: c, score, fitNotes, weeksToFinish, relevant };
   });
@@ -281,6 +288,12 @@ const TRACK_TO_CATEGORY: Record<string, string> = {
   "customer-success": "Customer Success",
   designer: "Design & UX",
   researcher: "Design & UX",
+  finance: "Finance & FinTech",
+  hr: "People & HR",
+  "project-management": "Project Management",
+  consulting: "Consulting & Strategy",
+  "content-writing": "Content & Writing",
+  cybersecurity: "Cybersecurity",
 };
 
 export function deriveCategory(course: Course): string {

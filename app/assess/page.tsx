@@ -106,6 +106,12 @@ const STEPS: Step[] = [
       { value: "growth", label: "Growth" },
       { value: "sales", label: "Sales" },
       { value: "customer-success", label: "Customer success" },
+      { value: "finance", label: "Finance & FinTech" },
+      { value: "hr", label: "HR & People" },
+      { value: "project-management", label: "Project management" },
+      { value: "consulting", label: "Consulting & strategy" },
+      { value: "content-writing", label: "Content & writing" },
+      { value: "cybersecurity", label: "Cybersecurity" },
     ],
   },
 ];

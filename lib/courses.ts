@@ -468,4 +468,351 @@ export const COURSES: Course[] = [
     summary:
       "Outcomes-driven CSM playbook. Clear stages, repeatable rituals. Used by CS leaders to standardize team operating cadence.",
   },
+  // Finance & FinTech
+  {
+    id: "wharton-financial-accounting",
+    title: "Introduction to Financial Accounting",
+    provider: "Coursera (Wharton, University of Pennsylvania)",
+    durationHours: 20,
+    level: "beginner",
+    skills: ["financial-accounting","financial-statements","balance-sheet"],
+    tracks: ["finance","business-analyst"],
+    url: "https://www.coursera.org/learn/wharton-accounting",
+    summary:
+      "The cleanest on-ramp to reading the three statements. Brian Bushee makes balance sheets and accruals click for non-accountants. Audit free, pay only for the cert.",
+  },
+  {
+    id: "cfi-fmva-financial-modeling",
+    title: "Financial Modeling & Valuation Analyst (FMVA) Certification",
+    provider: "Corporate Finance Institute",
+    durationHours: 120,
+    level: "intermediate",
+    skills: ["financial-modeling","valuation","excel","dcf"],
+    tracks: ["finance"],
+    url: "https://corporatefinanceinstitute.com/certifications/financial-modeling-valuation-analyst-fmva-program/",
+    summary:
+      "The practical credential for analysts and FP&A who need to build three-statement models and DCFs, not just talk about them. Self-paced, hands-on, recruiter-recognized.",
+  },
+  {
+    id: "wall-street-prep-premium",
+    title: "Financial & Valuation Modeling Certification (Premium Package)",
+    provider: "Wall Street Prep",
+    durationHours: 80,
+    level: "advanced",
+    skills: ["financial-modeling","lbo","m-and-a","comps"],
+    tracks: ["finance"],
+    url: "https://www.wallstreetprep.com/self-study-programs/premium-package/",
+    summary:
+      "The same case-based training banks run for new analysts. DCF, comps, M&A, and LBO built from real filings. For people targeting IB, PE, or equity research.",
+  },
+  {
+    id: "afp-fpac-certification",
+    title: "FPAC: Certified Corporate Financial Planning & Analysis Professional",
+    provider: "Association for Financial Professionals (AFP)",
+    durationHours: 150,
+    level: "advanced",
+    skills: ["fpa","forecasting","budgeting","performance-management"],
+    tracks: ["finance"],
+    url: "https://fpacert.financialprofessionals.org/",
+    summary:
+      "The senior credential for corporate FP&A. Two-part exam on forecasting, budgeting, and business partnering. For analysts ready to own the planning function, not just the model.",
+  },
+  {
+    id: "cfa-program",
+    title: "CFA Program (Chartered Financial Analyst)",
+    provider: "CFA Institute",
+    durationHours: 900,
+    level: "advanced",
+    skills: ["investment-analysis","portfolio-management","valuation","ethics"],
+    tracks: ["finance"],
+    url: "https://www.cfainstitute.org/programs/cfa-program",
+    summary:
+      "The heavyweight investment credential. Three levels, roughly 300 hours each, covering valuation, fixed income, and portfolio management. A multi-year commitment for buy-side and research careers.",
+  },
+
+  // People & HR
+  {
+    id: "umn-hr-people-managers",
+    title: "Human Resource Management: HR for People Managers Specialization",
+    provider: "Coursera (University of Minnesota)",
+    durationHours: 100,
+    level: "beginner",
+    skills: ["hr-fundamentals","performance-management","compensation","hiring"],
+    tracks: ["hr"],
+    url: "https://www.coursera.org/specializations/human-resource-management",
+    summary:
+      "The cleanest on-ramp to HR fundamentals: hiring, performance, and rewards, taught for people who manage people. Best first step for aspiring generalists and new managers.",
+  },
+  {
+    id: "hrci-hr-associate-cert",
+    title: "HRCI Human Resource Associate Professional Certificate",
+    provider: "Coursera (HRCI)",
+    durationHours: 94,
+    level: "beginner",
+    skills: ["talent-acquisition","employee-relations","compliance","hr-operations"],
+    tracks: ["hr"],
+    url: "https://www.coursera.org/professional-certificates/hrci-human-resource-associate",
+    summary:
+      "Covers the full HR stack end to end and preps you for the aPHR exam, no prior experience required. The credential-backed entry point for breaking into people ops.",
+  },
+  {
+    id: "wharton-people-analytics",
+    title: "People Analytics",
+    provider: "Coursera (Wharton, University of Pennsylvania)",
+    durationHours: 11,
+    level: "intermediate",
+    skills: ["people-analytics","hr-metrics","talent-management"],
+    tracks: ["hr","data-analyst"],
+    url: "https://www.coursera.org/learn/wharton-people-analytics",
+    summary:
+      "Short and sharp intro to data-driven people decisions from three Wharton pioneers. For HRBPs and recruiters who want to argue with data, not gut.",
+  },
+  {
+    id: "aihr-strategic-talent-acquisition",
+    title: "Strategic Talent Acquisition Certificate Program",
+    provider: "AIHR (Academy to Innovate HR)",
+    durationHours: 39,
+    level: "intermediate",
+    skills: ["talent-acquisition","sourcing","employer-branding","recruitment-analytics"],
+    tracks: ["hr"],
+    url: "https://www.aihr.com/courses/talent-acquisition-certification/",
+    summary:
+      "Practical, end-to-end recruiting playbook: EVP, sourcing, AI tooling, and funnel analytics. Built for recruiters and TA leads who own the hire, not just screen for it.",
+  },
+  {
+    id: "shrm-scp-senior",
+    title: "SHRM Senior Certified Professional (SHRM-SCP)",
+    provider: "SHRM",
+    durationHours: 80,
+    level: "advanced",
+    skills: ["hr-strategy","people-leadership","hr-policy"],
+    tracks: ["hr"],
+    url: "https://www.shrm.org/credentials/certification/shrm-scp",
+    summary:
+      "The senior HR credential that hiring committees actually recognize, built around strategy and policy, not memorization. For HRBPs and people leaders moving into director and CHRO tracks.",
+  },
+
+  // Project Management
+  {
+    id: "google-project-management-certificate",
+    title: "Google Project Management Professional Certificate",
+    provider: "Coursera (Google)",
+    durationHours: 140,
+    level: "beginner",
+    skills: ["project-management","agile","scrum","stakeholder-management"],
+    tracks: ["project-management","pm"],
+    url: "https://www.coursera.org/professional-certificates/google-project-management",
+    summary:
+      "The default on-ramp for people with zero PM background. Covers traditional, Agile, and Scrum basics plus real artifacts, and counts toward PMI CAPM education hours. Best ROI per hour for breaking into entry-level PM roles.",
+  },
+  {
+    id: "scrum-org-psm-i",
+    title: "Professional Scrum Master I (PSM I)",
+    provider: "Scrum.org",
+    durationHours: 20,
+    level: "intermediate",
+    skills: ["scrum","agile","scrum-master"],
+    tracks: ["project-management","devops"],
+    url: "https://www.scrum.org/assessments/professional-scrum-master-i-certification",
+    summary:
+      "The credential that actually proves you know the Scrum Guide, not just that you sat in a class. One exam, 85% to pass, lifetime validity, no renewal fees. The honest entry point for aspiring Scrum Masters.",
+  },
+  {
+    id: "pmi-acp-agile-certified-practitioner",
+    title: "PMI Agile Certified Practitioner (PMI-ACP)",
+    provider: "PMI",
+    durationHours: 35,
+    level: "intermediate",
+    skills: ["agile","scrum","kanban","lean"],
+    tracks: ["project-management","pm"],
+    url: "https://www.pmi.org/certifications/agile-acp",
+    summary:
+      "Framework-agnostic Agile cert spanning Scrum, Kanban, Lean, and XP, for people already running Agile teams. Pick this over a single-framework badge if your work crosses methods.",
+  },
+  {
+    id: "pmi-pmp-certification",
+    title: "Project Management Professional (PMP)",
+    provider: "PMI",
+    durationHours: 35,
+    level: "advanced",
+    skills: ["project-management","agile","stakeholder-management","delivery"],
+    tracks: ["project-management","pm"],
+    url: "https://www.pmi.org/certifications/project-management-pmp",
+    summary:
+      "The senior PM standard hiring managers and RFPs still ask for. Needs 36 months of leading projects to sit, and covers predictive, hybrid, and Agile delivery. Earn it when you want the salary bump and the title, not the fundamentals.",
+  },
+
+  // Consulting & Strategy
+  {
+    id: "mckinsey-forward-program",
+    title: "McKinsey.org Forward",
+    provider: "McKinsey.org",
+    durationHours: 20,
+    level: "beginner",
+    skills: ["structured-problem-solving","communication","adaptability"],
+    tracks: ["consulting","business-analyst"],
+    url: "https://www.mckinsey.org/our-programs/forward/overview",
+    summary:
+      "Free, 10-week intro to how consultants actually think. Builds structured problem solving and communicating-for-impact, plus a McKinsey badge. Best low-cost on-ramp for anyone eyeing strategy or analyst roles.",
+  },
+  {
+    id: "uva-darden-foundations-business-strategy",
+    title: "Foundations of Business Strategy",
+    provider: "Coursera (University of Virginia, Darden)",
+    durationHours: 9,
+    level: "beginner",
+    skills: ["business-strategy","competitive-analysis","swot-five-forces"],
+    tracks: ["consulting"],
+    url: "https://www.coursera.org/learn/uva-darden-strategy101",
+    summary:
+      "The framework starter kit: SWOT, Five Forces, value chain, strategy maps. Short, well-taught, and exactly the vocabulary a junior strategy analyst needs to sound credible in week one.",
+  },
+  {
+    id: "rocketblocks-consulting-case-prep",
+    title: "RocketBlocks Consulting Interview Prep",
+    provider: "RocketBlocks",
+    durationHours: 40,
+    level: "intermediate",
+    skills: ["case-interview","mental-math","case-structuring"],
+    tracks: ["consulting"],
+    url: "https://www.rocketblocks.me/consulting.php",
+    summary:
+      "Drill-based case prep built by ex-McKinsey, BCG, and Bain managers. Math, charts, and structuring reps over passive reading. The fastest way to get interview-ready for MBB and beyond.",
+  },
+  {
+    id: "cfi-corporate-business-strategy",
+    title: "Corporate & Business Strategy",
+    provider: "Corporate Finance Institute",
+    durationHours: 8,
+    level: "advanced",
+    skills: ["corporate-strategy","swot-analysis","dcf-modeling"],
+    tracks: ["consulting","business-analyst"],
+    url: "https://corporatefinanceinstitute.com/course/corporate-business-strategy-course/",
+    summary:
+      "Hands-on strategy work on a real case: external and internal analysis, DCF, multi-criteria selection, then a board-ready strategy doc. For analysts who need to back strategy with numbers, not slides.",
+  },
+  {
+    id: "uva-darden-advanced-business-strategy",
+    title: "Advanced Business Strategy",
+    provider: "Coursera (University of Virginia, Darden)",
+    durationHours: 10,
+    level: "advanced",
+    skills: ["corporate-strategy","diversification-strategy","international-strategy"],
+    tracks: ["consulting"],
+    url: "https://www.coursera.org/learn/uva-darden-advanced-business-strategy",
+    summary:
+      "The senior follow-on: dynamic, international, diversification, and stakeholder strategy. For operators moving from single-market tactics to corporate-scope decisions across industries and geographies.",
+  },
+
+  // Content & Writing
+  {
+    id: "google-technical-writing",
+    title: "Technical Writing Courses (Technical Writing One and Two)",
+    provider: "Google for Developers",
+    durationHours: 12,
+    level: "beginner",
+    skills: ["technical-writing","documentation","editing"],
+    tracks: ["content-writing","devops"],
+    url: "https://developers.google.com/tech-writing",
+    summary:
+      "Free, no-fluff foundation in clear technical prose, from grammar to doc structure to error messages. Best beginner entry point for engineers and writers moving into docs.",
+  },
+  {
+    id: "cu-boulder-business-writing",
+    title: "Business Writing",
+    provider: "Coursera (University of Colorado Boulder)",
+    durationHours: 14,
+    level: "beginner",
+    skills: ["business-writing","editing","communications"],
+    tracks: ["content-writing","pm"],
+    url: "https://www.coursera.org/learn/writing-for-business",
+    summary:
+      "Tightens everyday workplace writing, emails, briefs, reports, into something people actually read. Practical first credential for comms associates and anyone who writes to get work done.",
+  },
+  {
+    id: "awai-seven-figure-copywriting",
+    title: "The Accelerated Program for Seven-Figure Copywriting",
+    provider: "AWAI (American Writers & Artists Institute)",
+    durationHours: 60,
+    level: "intermediate",
+    skills: ["copywriting","direct-response","sales-copy"],
+    tracks: ["content-writing","marketing"],
+    url: "https://www.awai.com/copywriting/p/",
+    summary:
+      "The classic write-while-you-learn path into paid direct-response copywriting. Pricey, but the briefs are real client work, not exercises.",
+  },
+  {
+    id: "copyhackers-copywriter-certification",
+    title: "Copywriter Certification (Copy School)",
+    provider: "Copyhackers",
+    durationHours: 80,
+    level: "advanced",
+    skills: ["conversion-copywriting","copywriting","messaging"],
+    tracks: ["content-writing","marketing"],
+    url: "https://copyhackers.com/copywriter-certification/",
+    summary:
+      "Deep conversion-copywriting training with verifiable badges, SaaS, launch, and ecommerce tracks. For working copywriters who want to prove craft and command senior rates.",
+  },
+
+  // Cybersecurity
+  {
+    id: "isc2-certified-in-cybersecurity",
+    title: "Certified in Cybersecurity (CC)",
+    provider: "ISC2",
+    durationHours: 30,
+    level: "beginner",
+    skills: ["security-principles","access-control","network-security","grc"],
+    tracks: ["cybersecurity"],
+    url: "https://www.isc2.org/certifications/cc",
+    summary:
+      "The cleanest no-experience entry credential from a name hiring managers respect. Covers security principles, access control, and network basics. Best first stamp before Security+.",
+  },
+  {
+    id: "google-cybersecurity-certificate",
+    title: "Google Cybersecurity Professional Certificate",
+    provider: "Coursera (Google)",
+    durationHours: 170,
+    level: "beginner",
+    skills: ["siem","linux","python","incident-response"],
+    tracks: ["cybersecurity"],
+    url: "https://www.coursera.org/professional-certificates/google-cybersecurity",
+    summary:
+      "Job-ready fundamentals with real SIEM, Linux, Python, and SQL practice, not just theory. Built for career switchers with zero background. Also preps you for the Security+ exam.",
+  },
+  {
+    id: "comptia-security-plus",
+    title: "CompTIA Security+ (SY0-701)",
+    provider: "CompTIA",
+    durationHours: 120,
+    level: "intermediate",
+    skills: ["threat-management","cryptography","risk-management","network-security"],
+    tracks: ["cybersecurity"],
+    url: "https://www.comptia.org/en-us/certifications/security/",
+    summary:
+      "The baseline cert most security job posts actually list, and DoD 8140 approved. Vendor-neutral coverage of threats, crypto, and risk. Pass it and you clear the first HR filter.",
+  },
+  {
+    id: "tryhackme-soc-level-1",
+    title: "SOC Level 1",
+    provider: "TryHackMe",
+    durationHours: 50,
+    level: "intermediate",
+    skills: ["soc-analysis","siem","threat-intelligence","incident-response"],
+    tracks: ["cybersecurity"],
+    url: "https://tryhackme.com/path/outline/soclevel1",
+    summary:
+      "Hands-on blue team path that mirrors a real junior SOC shift: triage alerts, investigate in a SIEM, escalate. Browser-based labs, no setup. Best practical bridge into a first analyst role.",
+  },
+  {
+    id: "offsec-oscp-pen200",
+    title: "PEN-200: Penetration Testing with Kali Linux (OSCP/OSCP+)",
+    provider: "OffSec",
+    durationHours: 321,
+    level: "advanced",
+    skills: ["penetration-testing","exploitation","active-directory","privilege-escalation"],
+    tracks: ["cybersecurity"],
+    url: "https://www.offsec.com/courses/pen-200/",
+    summary:
+      "The gold-standard offensive cert with a brutal 24-hour hands-on exam, no multiple choice. Enumeration, exploitation, AD, and privesc against live machines. For people committing to a pentest career.",
+  },
 ];
