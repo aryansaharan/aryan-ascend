@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { SmoothScroll } from "@/components/SmoothScroll";
 
 const inter = Inter({
@@ -92,6 +93,7 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground">
         <SmoothScroll />
         {children}
+        <Analytics />
       </body>
     </html>
   );
