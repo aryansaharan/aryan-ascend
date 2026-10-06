@@ -62,11 +62,23 @@ export default function PlanPage() {
     }
   }, [payload, course, submit]);
 
-  function copyLink() {
-    navigator.clipboard?.writeText(window.location.href).then(() => {
+  async function copyLink() {
+    const url = window.location.href;
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      ok = true;
+    } catch {
+      // Clipboard API missing or blocked (permissions, older browsers).
+      ok = legacyCopy(url);
+    }
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } else {
+      // Last resort: let the user copy it by hand.
+      window.prompt("Copy your plan link:", url);
+    }
   }
 
   return (
@@ -304,6 +316,25 @@ export default function PlanPage() {
       </div>
     </main>
   );
+}
+
+// Fallback copy for browsers where navigator.clipboard is unavailable.
+function legacyCopy(text: string): boolean {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
 }
 
 function Caret() {

@@ -107,8 +107,13 @@ export default function Landing() {
                 <Link
                   href="/assess"
                   onClick={() => {
-                    if (typeof window !== "undefined") {
+                    // A new session starts blank: clear saved answers and the
+                    // cached shortlist from any earlier run in this tab.
+                    try {
                       localStorage.removeItem("ascend.profile.v1");
+                      sessionStorage.removeItem("ascend.recs.v2");
+                    } catch {
+                      // storage can be unavailable (private mode); non-fatal
                     }
                   }}
                   className="relative group inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl py-3.5 px-6 font-medium text-[15px] shadow-[0_10px_30px_-12px_rgba(10,10,10,0.45)]"

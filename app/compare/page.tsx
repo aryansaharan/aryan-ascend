@@ -432,7 +432,7 @@ export default function Compare() {
           >
             ← Run a fresh session
           </Link>
-          <SaveSessionStub tooltipPosition="bottom" />
+          <SaveSessionStub />
         </div>
       </div>
     </main>

@@ -17,7 +17,10 @@ import { useProfile } from "@/lib/store";
 import { recommend, type Profile, type Recommendation } from "@/lib/recommend";
 import { picksSchema } from "@/lib/recommend-schema";
 import { enrichPicks } from "@/lib/enrich";
-import { cacheRecommendations } from "@/lib/recommend-client";
+import {
+  cacheRecommendations,
+  readCachedRecommendations,
+} from "@/lib/recommend-client";
 import { SaveSessionStub } from "@/components/SaveSessionStub";
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
@@ -115,27 +118,43 @@ export default function Recommendations() {
     },
   });
 
-  useEffect(() => {
-    if (!profileReady) return;
-    const ready = REQUIRED.every((k) => {
+  const complete =
+    profileReady &&
+    REQUIRED.every((k) => {
       const v = profile[k];
       return v !== undefined && (Array.isArray(v) ? v.length > 0 : true);
     });
-    if (!ready) {
+
+  // Coming back to this page (Back to picks, browser Back) with the same
+  // answers shows the shortlist already ranked for them, so it matches what
+  // /compare showed and doesn't pay for a second model call.
+  const cached = useMemo(() => {
+    if (!complete) return null;
+    const hit = readCachedRecommendations(profile as Profile);
+    return hit && hit.recommendations.length > 0 ? hit : null;
+  }, [complete, profile]);
+
+  useEffect(() => {
+    if (!profileReady) return;
+    if (!complete) {
       router.replace("/assess");
       return;
     }
     if (!submittedRef.current) {
       submittedRef.current = true;
-      submit({ profile });
+      if (!cached) submit({ profile });
     }
-  }, [profile, profileReady, router, submit]);
+  }, [profile, profileReady, complete, cached, router, submit]);
 
-  const readBack = object?.readBack ?? "";
+  const readBack = cached?.readBack ?? object?.readBack ?? "";
   const liveRecs = useMemo(
-    () => fallback ?? enrichPicks(object?.picks, profile as Profile),
-    [fallback, object, profile],
+    () =>
+      cached?.recommendations ??
+      fallback ??
+      enrichPicks(object?.picks, profile as Profile),
+    [cached, fallback, object, profile],
   );
+  const shownEngine = cached?.engine ?? engine;
 
   const done = !isLoading || fallback !== null;
   const showEmpty =
@@ -192,7 +211,7 @@ export default function Recommendations() {
 
           {done && liveRecs.length > 0 && (
             <div className="mt-3 mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
-              {engine === "ai"
+              {shownEngine === "ai"
                 ? "// Ranked by AI from your answers"
                 : "// Ranked by Ascend's matching engine"}
             </div>
