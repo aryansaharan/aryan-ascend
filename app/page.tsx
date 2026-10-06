@@ -250,14 +250,14 @@ export default function Landing() {
           <div className="mt-7 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             <TestimonialCard
               quote="Helped me cut my reading list from 30 tabs to 3 courses I actually finished."
-              author="Aanya Mehta"
-              role="Software Engineer at Razorpay, 2 yrs"
+              author="Vipul Goel"
+              role="Pronto"
               delay={0}
             />
             <TestimonialCard
               quote="Confirmed the one growth course I'd been circling for months. Started it the next morning."
-              author="Ishaan Kapoor"
-              role="Growth Marketer at Zerodha, 4 yrs"
+              author="Akshit Panwar"
+              role="Pronto"
               delay={0.1}
             />
           </div>
