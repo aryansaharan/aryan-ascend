@@ -88,7 +88,7 @@ export default function OpengraphImage() {
               fontWeight: 500,
             }}
           >
-            NextLeap MVP
+            Free · No signup
           </div>
         </div>
 
@@ -112,29 +112,32 @@ export default function OpengraphImage() {
           >
             A 15-minute decision session
           </div>
+          {/* Two explicit lines so the headline never wraps unpredictably. */}
           <div
             style={{
               display: "flex",
-              flexWrap: "wrap",
-              fontSize: 124,
-              lineHeight: 1.02,
+              flexDirection: "column",
+              fontSize: 100,
+              lineHeight: 1.05,
               letterSpacing: "-0.03em",
               color: "#0A0A0A",
               fontWeight: 600,
             }}
           >
-            <span>Find your next</span>
-            <span
-              style={{
-                fontStyle: "italic",
-                fontFamily: "serif",
-                fontWeight: 400,
-                marginLeft: 24,
-              }}
-            >
-              skill
-            </span>
-            <span style={{ marginLeft: 24 }}>in 15 minutes.</span>
+            <div style={{ display: "flex" }}>
+              <span>Find your next</span>
+              <span
+                style={{
+                  fontStyle: "italic",
+                  fontFamily: "serif",
+                  fontWeight: 400,
+                  marginLeft: 16,
+                }}
+              >
+                skill
+              </span>
+            </div>
+            <div style={{ display: "flex" }}>in 15 minutes.</div>
           </div>
         </div>
 

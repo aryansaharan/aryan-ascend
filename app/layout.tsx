@@ -47,7 +47,6 @@ export const metadata: Metadata = {
     "learning shortlist",
     "skill assessment",
     "professional development",
-    "NextLeap",
   ],
   robots: {
     index: true,

@@ -153,7 +153,7 @@ export default function Landing() {
             <Feature
               num="03"
               title="Peer Reviews"
-              body="Outcomes from learners in your cohort. Confidence builders."
+              body="Outcomes from learners like you. Confidence builders."
             />
             <Feature
               num="04"

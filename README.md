@@ -3,28 +3,28 @@
 **Find your next skill in 15 minutes.** A guided decision-support tool for
 early-career professionals who want to upskill but stall out on *what to learn
 next*. Ascend turns a short assessment into a small, honest, AI-reasoned
-shortlist — and then into a learning plan you can actually start.
+shortlist, and then into a learning plan you can actually start.
 
 Live: https://ascendmvp.vercel.app
 
-Built as the MVP for the Ascend product concept (NextLeap). The problem framing,
-user research, and metrics come from a real survey of early-career professionals
-(see "What's real" below).
+The problem framing, user research, and metrics come from a real survey of
+early-career professionals (see "What's real" below).
 
 ---
 
 ## The flow
 
-1. **Assess** (`/assess`) — six short questions: your role (free text), years of
-   experience, goal, self-rated level, weekly time, and the tracks pulling you.
-2. **Recommend** (`/recommendations`) — a live AI pass ranks the catalog against
+1. **Assess** (`/assess`): six short questions covering your role (free text),
+   years of experience, goal, self-rated level, weekly time, and the tracks
+   pulling you.
+2. **Recommend** (`/recommendations`): a live AI pass ranks the catalog against
    your whole profile and **streams** 1–5 picks back, each with a rationale that
    quotes something you actually typed. A built-in advisor lets you push back
    ("why not the Kubernetes course?") and get a grounded answer.
-3. **Compare** (`/compare`) — the top three side by side.
-4. **Plan** (`/plan`) — pick one and Ascend generates a week-by-week plan sized
+3. **Compare** (`/compare`): the top three side by side.
+4. **Plan** (`/plan`): pick one and Ascend generates a week-by-week plan sized
    to your real weekly hours, with a concrete first step for the next 48 hours.
-   The plan lives entirely in a shareable URL — no account, no database.
+   The plan lives entirely in a shareable URL: no account, no database.
 
 ## How the AI works
 
@@ -49,14 +49,14 @@ fallback so the app never dead-ends).
 ## Architecture
 
 - **Next.js 16** (App Router, Turbopack), React 19, Tailwind v4, Framer Motion.
-- `lib/recommend-schema.ts` — Zod schemas shared by server and client, so both
+- `lib/recommend-schema.ts`: Zod schemas shared by server and client, so both
   agree on the streamed shape.
-- `lib/recommend-ai.ts` — server-only Gemini wiring + prompts.
-- `lib/enrich.ts` — joins a (possibly partial, mid-stream) pick with the real
+- `lib/recommend-ai.ts`: server-only Gemini wiring + prompts.
+- `lib/enrich.ts`: joins a (possibly partial, mid-stream) pick with the real
   course record; used identically by the API, the streaming page, and compare.
-- `lib/recommend-client.ts` — sessionStorage cache so `/recommendations` and
+- `lib/recommend-client.ts`: sessionStorage cache so `/recommendations` and
   `/compare` show the same picks without a second model call.
-- `lib/plan-link.ts` — encodes a plan into a shareable URL.
+- `lib/plan-link.ts`: encodes a plan into a shareable URL.
 
 ## Environment
 
@@ -85,4 +85,4 @@ npm run dev
   high-signal resources, not an exhaustive index.
 - **Sample data:** the peer reviews on the compare screen are illustrative
   placeholders for the planned Peer Reviews module (and are labeled as such
-  in-app), pending real learner cohorts.
+  in-app), pending real learner reviews.

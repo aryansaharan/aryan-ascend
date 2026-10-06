@@ -389,7 +389,7 @@ export default function Compare() {
 
           <p className="mt-5 text-[11px] italic text-muted-2">
             Synthetic peer reviews, sample data for the prototype. Real version
-            uses verified learner cohorts.
+            uses verified learner reviews.
           </p>
         </section>
 
