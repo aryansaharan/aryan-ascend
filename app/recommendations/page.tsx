@@ -490,6 +490,7 @@ function Advisor({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="e.g. Why not something more advanced?"
+          maxLength={500}
           className="flex-1 bg-card rounded-xl px-3.5 py-2.5 text-[14px] text-foreground placeholder:text-muted-2 outline-none border border-border focus:border-foreground transition-colors"
         />
         <button

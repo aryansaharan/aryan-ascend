@@ -43,10 +43,13 @@ export default function PlanPage() {
   );
   const submittedRef = useRef(false);
   const [copied, setCopied] = useState(false);
+  // Set when the stream ends without a complete plan (e.g. cut off early).
+  const [incomplete, setIncomplete] = useState(false);
 
   const { object, submit, isLoading, error } = useObject({
     api: "/api/plan",
     schema: planSchema,
+    onFinish: ({ error: invalid }) => setIncomplete(Boolean(invalid)),
   });
 
   const course = payload
@@ -243,7 +246,7 @@ export default function PlanPage() {
               </motion.section>
             )}
 
-            {error && (
+            {(error || (incomplete && !isLoading)) && (
               <section className="mt-8 bg-card-alt rounded-2xl p-6">
                 <p className="text-foreground">
                   The plan stopped early. You can try again, or head straight to
@@ -253,6 +256,7 @@ export default function PlanPage() {
                   onClick={() => {
                     if (payload && course && !isLoading) {
                       submittedRef.current = true;
+                      setIncomplete(false);
                       submit({
                         profile: payload.profile,
                         courseId: payload.courseId,

@@ -213,6 +213,7 @@ export default function Assess() {
                       if (e.key === "Enter" && canAdvance()) next();
                     }}
                     placeholder="e.g. Early-career frontend engineer at a startup"
+                    maxLength={200}
                     autoFocus
                     className="w-full bg-card-alt rounded-2xl px-4 py-3.5 text-foreground placeholder:text-muted-2 text-base outline-none border border-transparent focus:border-foreground transition-colors"
                   />

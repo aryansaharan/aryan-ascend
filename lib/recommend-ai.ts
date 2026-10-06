@@ -34,6 +34,16 @@ export function model() {
   return google(MODEL);
 }
 
+// Gemini counts hidden "thinking" tokens against maxOutputTokens, so with a
+// tight cap the model could spend it all reasoning and return an empty or cut
+// off answer. Turn thinking down where the model allows it, so every route's
+// cap bounds the visible answer (and cost) instead.
+export const providerOptions = /gemini-2\.5-flash/.test(MODEL)
+  ? { google: { thinkingConfig: { thinkingBudget: 0 } } }
+  : /gemini-3.*flash/.test(MODEL)
+    ? { google: { thinkingConfig: { thinkingLevel: "minimal" as const } } }
+    : undefined;
+
 // Built once. The catalog is identical across requests; only the profile varies.
 export const catalogText = JSON.stringify(
   COURSES.map((c) => ({
@@ -65,6 +75,8 @@ export function streamPicks(profile: Profile) {
     model: model(),
     schema: picksSchema,
     temperature: 0.4,
+    maxOutputTokens: 2000,
+    providerOptions,
     // On the free tier a 429 is the common failure; retrying 3x just triples
     // quota burn and (honoring the provider's retry-after) can hang the user for
     // up to a minute before the client falls back. One retry is the better

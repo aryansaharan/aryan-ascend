@@ -1,5 +1,7 @@
 import { recommend, type Profile } from "@/lib/recommend";
 import { aiEnabled, streamPicks } from "@/lib/recommend-ai";
+import { guardRequest } from "@/lib/api-guard";
+import { recommendBodySchema } from "@/lib/request-schemas";
 
 export const runtime = "nodejs";
 // Headroom for the model to stream a full response.
@@ -50,14 +52,9 @@ async function deterministicResponse(profile: Profile): Promise<Response> {
 }
 
 export async function POST(request: Request) {
-  let profile: Profile;
-  try {
-    const body = (await request.json()) as { profile?: Profile };
-    if (!body.profile) throw new Error("missing profile");
-    profile = body.profile;
-  } catch {
-    return Response.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const guarded = await guardRequest(request, "recommend", recommendBodySchema);
+  if (!guarded.ok) return guarded.response;
+  const { profile } = guarded.body;
 
   // Stream the live model when a key is configured. streamObject returns
   // synchronously and streams asynchronously; a setup error here (bad config)
