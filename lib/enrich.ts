@@ -41,7 +41,6 @@ export function enrichPick(
   return {
     course,
     score,
-    rationale: pick.whyThisFitsYou ?? "",
     fitNotes: Array.isArray(pick.signals)
       ? pick.signals
           .filter((s): s is { label: string; text: string } =>

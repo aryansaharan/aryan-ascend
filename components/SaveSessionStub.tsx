@@ -51,5 +51,3 @@ export function SaveSessionStub({
     </div>
   );
 }
-
-export default SaveSessionStub;

@@ -43,7 +43,6 @@ export const picksSchema = z.object({
 });
 
 export type Picks = z.infer<typeof picksSchema>;
-export type Pick = z.infer<typeof pickSchema>;
 
 // ─── Learning plan (the commitment artifact) ───────────────────────────────
 
@@ -74,5 +73,3 @@ export const planSchema = z.object({
     .string()
     .describe("one sentence on what the user will be able to DO when the plan is finished, tied to their goal"),
 });
-
-export type Plan = z.infer<typeof planSchema>;

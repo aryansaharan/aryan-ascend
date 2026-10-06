@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -19,10 +25,21 @@ import { COURSES } from "@/lib/courses";
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
 
+// The query string only exists in the browser. Prerender and hydration see
+// null, then the client re-renders with the real value.
+const noopSubscribe = () => () => {};
+const readSearch = () => window.location.search;
+const serverSearch = () => null;
+
 export default function PlanPage() {
+  const search = useSyncExternalStore(noopSubscribe, readSearch, serverSearch);
   // undefined = still reading the URL; null = invalid/missing link.
-  const [payload, setPayload] = useState<PlanPayload | null | undefined>(
-    undefined,
+  const payload = useMemo<PlanPayload | null | undefined>(
+    () =>
+      search === null
+        ? undefined
+        : decodePlan(new URLSearchParams(search).get("d")),
+    [search],
   );
   const submittedRef = useRef(false);
   const [copied, setCopied] = useState(false);
@@ -31,11 +48,6 @@ export default function PlanPage() {
     api: "/api/plan",
     schema: planSchema,
   });
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setPayload(decodePlan(params.get("d")));
-  }, []);
 
   const course = payload
     ? COURSES.find((c) => c.id === payload.courseId)
@@ -92,7 +104,7 @@ export default function PlanPage() {
           <>
             <section className="mt-6">
               <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
-                // Learning plan
+                {"// Learning plan"}
               </div>
               <motion.h1
                 initial={{ opacity: 0, y: 12 }}

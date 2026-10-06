@@ -15,9 +15,9 @@ export default function NotFound() {
 
       <div className="relative w-full max-w-3xl mx-auto flex flex-col min-h-screen px-6 sm:px-10 lg:px-16">
         <header className="py-5 flex items-center justify-between">
-          <Logo size="md" />
+          <Logo />
           <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
-            // 404
+            {"// 404"}
           </div>
         </header>
 

@@ -12,7 +12,6 @@ export type Profile = {
 export type Recommendation = {
   course: Course;
   score: number;
-  rationale: string;
   fitNotes: { label: string; text: string }[];
   category: string;
   careerImpact: string;
@@ -93,8 +92,8 @@ function experienceLabel(e: Profile["experience"]): string {
 /**
  * Deterministic recommender: multi-signal scoring over profile + corpus.
  * Every assessment answer feeds a signal (interests, level, time, goal,
- * experience, role). Designed so the scorer can be swapped for an LLM call
- * later: pass profile + COURSES, ask for top-5 with reasoning.
+ * experience, role). This is the fallback when the AI recommender is not
+ * configured or fails, so the flow never dead-ends.
  */
 export async function recommend(profile: Profile): Promise<Recommendation[]> {
   const weeklyHours = parseTime(profile.timePerWeek);
@@ -244,7 +243,6 @@ export async function recommend(profile: Profile): Promise<Recommendation[]> {
     course: t.course,
     score: t.score,
     fitNotes: t.fitNotes,
-    rationale: buildRationale(t.course, t.fitNotes),
     category: deriveCategory(t.course),
     careerImpact: deriveCareerImpact(t.course, profile),
     prerequisites: derivePrerequisites(t.course),
@@ -424,14 +422,6 @@ function deriveWhyThisFits(
           : `A notch below your ${profile.level} level, useful for filling gaps fast`;
 
   return `${opener} ${levelClause}. ${course.summary}`;
-}
-
-function buildRationale(
-  course: Course,
-  notes: { label: string; text: string }[],
-): string {
-  const lead = notes[0]?.text ?? "Solid all-round fit.";
-  return `${lead} ${course.summary}`;
 }
 
 function parseTime(t: Profile["timePerWeek"]): number {

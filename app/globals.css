@@ -9,10 +9,8 @@
   --color-card-alt: #F4F4F2;
   --color-border: #E7E5E0;
   --color-border-soft: #F0EFEB;
-  --color-accent: #0A0A0A;
   --color-accent-fg: #FFFFFF;
   --color-success: #16A34A;
-  --color-info: #3B82F6;
   --font-display: var(--font-inter), -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
   --font-serif: var(--font-instrument-serif), "Times New Roman", serif;
   --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
@@ -33,7 +31,7 @@ body {
   overflow-x: clip;
 }
 
-/* Refined focus ring for keyboard users:visible but not aggressive */
+/* Refined focus ring for keyboard users: visible but not aggressive */
 *:focus-visible {
   outline: 2px solid #0A0A0A;
   outline-offset: 2px;
@@ -47,7 +45,7 @@ a, button {
               border-color 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Grain:subtle paper texture overlay. Use sparingly. */
+/* Grain: subtle paper texture overlay. Use sparingly. */
 .grain::before {
   content: "";
   position: absolute;
@@ -59,7 +57,7 @@ a, button {
   background-size: 280px 280px;
 }
 
-/* Editorial accent:Instrument Serif italic at scale */
+/* Editorial accent: Instrument Serif italic at scale */
 .serif-italic {
   font-family: var(--font-serif);
   font-style: italic;
@@ -67,7 +65,7 @@ a, button {
   letter-spacing: -0.005em;
 }
 
-/* Mono accent for tiny labels:gives small UI text a refined tech-y character */
+/* Mono accent for tiny labels: gives small UI text a refined tech-y character */
 .mono-label {
   font-family: var(--font-mono);
   font-weight: 400;
@@ -75,7 +73,7 @@ a, button {
   font-feature-settings: "tnum" 1, "ss01" 1;
 }
 
-/* Aurora bloom:full-bleed atmospheric light leaks at the top of the page.
+/* Aurora bloom: full-bleed atmospheric light leaks at the top of the page.
  * Anchored to the first viewport so colors stay concentrated behind the hero,
  * then fades cleanly into the cream paper below.
  * Light theme palette: peach -> rose -> lilac -> sky, each blob blurred heavy.
@@ -101,11 +99,6 @@ a, button {
   filter: blur(52px) saturate(1.18);
 }
 
-/* Hero-glow is now a no-op:aurora lives at the page level for full-bleed effect */
-.hero-glow {
-  display: none;
-}
-
 /* Layered, subtle card shadow that gets richer on hover */
 .card-elev {
   box-shadow:
@@ -121,12 +114,6 @@ a, button {
 
 body {
   min-height: 100vh;
-}
-
-/* Keep the noise overlay utility but it's not used in app screens:only if needed for accents */
-.noise-overlay {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-  background-size: 300px 300px;
 }
 
 @media (prefers-reduced-motion: reduce) {

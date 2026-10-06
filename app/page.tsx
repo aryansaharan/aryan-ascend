@@ -24,11 +24,11 @@ export default function Landing() {
       <div className="grain absolute inset-0 pointer-events-none" aria-hidden />
 
       <div className="relative w-full max-w-5xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col">
-        {/* Top bar:motion.dev-inspired metadata strip */}
+        {/* Top bar: motion.dev-inspired metadata strip */}
         <header className="py-6 sm:py-7 flex items-center justify-between">
-          <Logo size="md" />
+          <Logo />
           <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2 flex items-center gap-2">
-            <span>// V0.1.0</span>
+            <span>{"// V0.1.0"}</span>
             <span className="text-border">·</span>
             <span>GUIDED DECISION SUPPORT</span>
           </div>
@@ -36,12 +36,12 @@ export default function Landing() {
 
         {/* Pre-hero metadata strip */}
         <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2 flex items-center gap-3 pt-6 sm:pt-8">
-          <span>// 01 NEW SESSION</span>
+          <span>{"// 01 NEW SESSION"}</span>
           <span className="flex-1 h-px bg-border-soft" />
           <span>EST. READ TIME 15 MIN</span>
         </div>
 
-        {/* Hero:left-aligned to the container. Hero text constrains per-element, not via inner wrapper. */}
+        {/* Hero: left-aligned to the container. Hero text constrains per-element, not via inner wrapper. */}
         <section className="relative pt-10 sm:pt-16 lg:pt-20 pb-12 sm:pb-16">
           <div className="relative flex flex-col items-start gap-7">
             <motion.div
@@ -134,10 +134,10 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* What's inside:4 numbered features (motion.dev-style row) */}
+        {/* What's inside: 4 numbered features (motion.dev-style row) */}
         <section className="border-t border-border-soft pt-8 sm:pt-10 pb-6">
           <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2 mb-6">
-            // INSIDE
+            {"// INSIDE"}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-6">
             <Feature
@@ -167,7 +167,7 @@ export default function Landing() {
         <section className="border-t border-border-soft pt-6 sm:pt-8 mt-6 sm:mt-10">
           <div className="flex flex-col sm:flex-row sm:items-baseline gap-3 sm:gap-8">
             <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2 shrink-0">
-              // SOURCED FROM
+              {"// SOURCED FROM"}
             </div>
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5 text-[12px] text-muted">
               <span>Coursera</span>
@@ -211,7 +211,7 @@ export default function Landing() {
           />
         </motion.section>
 
-        {/* How it works:equal-width cards. Funnel conveyed by internal progress arc, not card width. */}
+        {/* How it works: equal-width cards. Funnel conveyed by internal progress arc, not card width. */}
         <section className="mt-20 sm:mt-28">
           <SectionEyebrow index="02">How it works</SectionEyebrow>
           <div className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -282,7 +282,8 @@ function SectionEyebrow({
   return (
     <div className="flex items-baseline gap-3">
       <span className="mono-label text-[10px] sm:text-[11px] uppercase tracking-[0.28em] text-muted font-medium">
-        // {index} {children}
+        {"// "}
+        {index} {children}
       </span>
       <span className="flex-1 h-px bg-border-soft" />
     </div>
@@ -353,7 +354,7 @@ function Step({
       </h3>
       <p className="text-[13.5px] leading-relaxed text-muted">{body}</p>
 
-      {/* Funnel bar:width reflects the step's scale */}
+      {/* Funnel bar: width reflects the step's scale */}
       <div className="mt-4 pt-4 border-t border-border-soft">
         <div className="relative h-[3px] rounded-full bg-card-alt overflow-hidden">
           <motion.div
@@ -394,18 +395,15 @@ function Stat({
 
   useEffect(() => {
     if (typeof number !== "number") return;
-    if (reduced) {
-      setDisplay(`${number}${suffix ?? ""}`);
-      return;
-    }
     const unsubscribe = rounded.on("change", (v) =>
       setDisplay(`${v}${suffix ?? ""}`),
     );
-    const controls = animate(count, number, {
-      duration: 1.2,
-      ease: easeOut,
-      delay: 0.3,
-    });
+    // Reduced motion jumps straight to the final number instead of counting up.
+    const controls = animate(
+      count,
+      number,
+      reduced ? { duration: 0 } : { duration: 1.2, ease: easeOut, delay: 0.3 },
+    );
     return () => {
       unsubscribe();
       controls.stop();
