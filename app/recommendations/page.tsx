@@ -293,6 +293,16 @@ export default function Recommendations() {
   );
 }
 
+// The advisor sometimes answers in markdown, but the panel shows plain text.
+// Drop bold markers (even half-streamed ones), turn list markers into
+// bullets, and remove heading hashes.
+function plainText(s: string): string {
+  return s
+    .replace(/\*\*/g, "")
+    .replace(/^[ \t]*[*-][ \t]+/gm, "• ")
+    .replace(/^#{1,6}[ \t]+/gm, "");
+}
+
 function BlinkCaret() {
   return (
     <motion.span
@@ -521,7 +531,7 @@ function Advisor({
               </div>
             )}
             <p className="text-[14px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
-              {completion}
+              {plainText(completion)}
               {isLoading && !completion && (
                 <span className="inline-flex items-center gap-2 text-muted">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking
