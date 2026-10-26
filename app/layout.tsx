@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/next";
+import { MotionProvider } from "@/components/MotionProvider";
+import { SiteAnalytics } from "@/components/SiteAnalytics";
 import { SmoothScroll } from "@/components/SmoothScroll";
 
 const inter = Inter({
@@ -25,9 +26,9 @@ const jetbrainsMono = JetBrains_Mono({
 
 const SITE_URL = "https://ascendmvp.vercel.app";
 const SITE_NAME = "Ascend";
-const SITE_TAGLINE = "Find your next skill in 15 minutes";
+const SITE_TAGLINE = "One course you can finish";
 const SITE_DESCRIPTION =
-  "A guided 15-minute session that maps your role, goals, and time, then narrows hundreds of course options into a 3 to 5 shortlist you'll actually finish.";
+  "For people early in their career who know the direction they want to grow in. Describe your situation in your own words. Ascend's AI reads it and matches real course modules to your gaps, code checks your hours and budget, and you get one course you can finish with your first session booked.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -43,9 +44,10 @@ export const metadata: Metadata = {
   keywords: [
     "Ascend",
     "course recommender",
+    "AI course matching",
+    "skill gaps",
+    "learning plan",
     "career skills",
-    "learning shortlist",
-    "skill assessment",
     "professional development",
   ],
   robots: {
@@ -91,8 +93,8 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         <SmoothScroll />
-        {children}
-        <Analytics />
+        <MotionProvider>{children}</MotionProvider>
+        <SiteAnalytics />
       </body>
     </html>
   );

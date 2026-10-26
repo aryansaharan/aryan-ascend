@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Ascend: Find your next skill in 15 minutes.";
+export const alt =
+  "Ascend: One course you can finish. AI reads your situation and matches real course modules to your gaps.";
 export const size = {
   width: 1200,
   height: 630,
@@ -11,8 +12,8 @@ export const contentType = "image/png";
  * Programmatic Open Graph image.
  *
  * Light-theme, editorial composition that mirrors the landing aurora:
- * cream paper, soft peach + lilac blooms, large serif-italic "Ascend"
- * wordmark, and the tagline in restrained sans.
+ * cream paper, soft peach + lilac blooms, the serif-italic "Ascend"
+ * wordmark, the headline from the landing, and one line on what the AI does.
  *
  * Note (Next 16): no fonts are loaded, so type renders with Satori's
  * built-in fallback. That keeps the build hermetic and avoids any
@@ -110,7 +111,7 @@ export default function OpengraphImage() {
               fontWeight: 500,
             }}
           >
-            A 15-minute decision session
+            Read by AI, checked by code
           </div>
           {/* Two explicit lines so the headline never wraps unpredictably. */}
           <div
@@ -124,20 +125,20 @@ export default function OpengraphImage() {
               fontWeight: 600,
             }}
           >
+            <div style={{ display: "flex" }}>One course you</div>
             <div style={{ display: "flex" }}>
-              <span>Find your next</span>
+              <span>can</span>
               <span
                 style={{
                   fontStyle: "italic",
                   fontFamily: "serif",
                   fontWeight: 400,
-                  marginLeft: 16,
+                  marginLeft: 24,
                 }}
               >
-                skill
+                finish.
               </span>
             </div>
-            <div style={{ display: "flex" }}>in 15 minutes.</div>
           </div>
         </div>
 
@@ -162,8 +163,8 @@ export default function OpengraphImage() {
               lineHeight: 1.35,
             }}
           >
-            Map your role, goals, and time. Narrow hundreds of courses into a 3
-            to 5 shortlist you&apos;ll actually finish.
+            Describe where you are. The AI matches real course modules to your
+            gaps. You get one course and your first session booked.
           </div>
           <div
             style={{

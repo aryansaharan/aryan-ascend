@@ -63,8 +63,8 @@ export default function Error({
             transition={{ duration: 0.6, delay: 0.15, ease: easeOut }}
             className="mt-6 text-[15px] sm:text-base text-muted max-w-[44ch]"
           >
-            Most of these clear on a retry. If it sticks, head back to the
-            landing page and start a fresh session.
+            Most of these clear on a retry. If it sticks, go back to the start.
+            Plans you saved stay on this device.
           </motion.p>
 
           <motion.div
@@ -84,7 +84,7 @@ export default function Error({
               href="/"
               className="inline-flex items-center gap-2 bg-card-alt text-foreground rounded-2xl px-6 py-3.5 font-medium text-[15px] hover:gap-3 transition-all"
             >
-              Back to landing
+              Back to the start
               <ArrowRight className="w-4 h-4" />
             </Link>
           </motion.div>

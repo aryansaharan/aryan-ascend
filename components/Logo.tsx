@@ -8,7 +8,7 @@ import Link from "next/link";
  */
 export function Logo() {
   return (
-    <Link href="/" className="inline-flex">
+    <Link href="/" className="inline-flex items-center min-h-10 py-2 -my-2">
       <span className="inline-flex items-baseline">
         <span
           className="serif-italic text-[24px] leading-none text-foreground"

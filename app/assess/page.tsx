@@ -1,156 +1,504 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import { useProfile } from "@/lib/store";
-import type { Profile } from "@/lib/recommend";
+import {
+  Suspense,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type Dispatch,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { BlinkCaret, EngineLine, TextLink } from "@/components/ui";
+import { SituationInput, cleanSituation } from "@/components/SituationInput";
+import {
+  OptionCard,
+  Understanding,
+  UnderstandingSkeleton,
+  checkStateFrom,
+  editsFrom,
+  missingFor,
+  type CheckState,
+} from "@/components/Understanding";
+import { loadUnderstanding, situationKey } from "@/lib/ai-client";
+import { EXAMPLES, exampleById, type ExampleProfile } from "@/lib/examples";
+import { budgetLabel, hoursChipLabel } from "@/lib/format";
+import { useDisplayCurrency } from "@/lib/hooks";
+import { trackMilestone } from "@/lib/metrics";
+import { isAiEngine } from "@/lib/pick-types";
+import { storageWorks } from "@/lib/plan-store";
+import { BUDGETS, HOURS, LIMITS, isBudget, isHours, type Budget, type Hours } from "@/lib/profile";
+import { loadProfile, saveProfile, writeProfile, type ProfileDraft } from "@/lib/store";
+import { understandEngineLine, UNDERSTAND_LOADING } from "@/lib/templates";
+import {
+  hoursFromText,
+  profileFromUnderstanding,
+  rulesUnderstandResponse,
+  snapHours,
+  type ProfileEdits,
+  type UnderstandResponse,
+} from "@/lib/understand";
 
-type Step = {
-  id: keyof Profile;
-  question: string;
-  helper?: string;
-  why: string;
-  category: string;
-  type: "single" | "multi" | "text";
-  options?: { value: string; label: string; hint?: string }[];
-};
-
-const STEPS: Step[] = [
-  {
-    id: "currentRole",
-    question: "Where are you right now?",
-    helper: "One line is plenty. Title, stack, whatever feels true.",
-    why: "We use this to calibrate everything that follows. No judgment, just context.",
-    category: "Context",
-    type: "text",
-  },
-  {
-    id: "experience",
-    question: "How long have you been doing this kind of work?",
-    helper: "Pick the bucket that's closest. We're not auditing your CV.",
-    why: "Experience shapes what advice will actually be useful, versus condescending.",
-    category: "Background",
-    type: "single",
-    options: [
-      { value: "0-1", label: "Less than a year" },
-      { value: "1-3", label: "1 to 3 years" },
-      { value: "3-5", label: "3 to 5 years" },
-      { value: "5+", label: "5+ years" },
-    ],
-  },
-  {
-    id: "goal",
-    question: "What are you actually trying to do?",
-    helper: "Be honest. Pick the one that's loudest in your head this month.",
-    why: "Your goal is the single biggest filter we apply. Picking the right one matters more than picking the perfect one.",
-    category: "Direction",
-    type: "single",
-    options: [
-      { value: "promotion", label: "Get promoted", hint: "Senior, lead, the next title" },
-      { value: "switch-field", label: "Switch fields", hint: "New domain, new role" },
-      { value: "salary", label: "Earn more", hint: "Compounding skills, market signal" },
-      { value: "deeper-craft", label: "Go deeper on craft", hint: "Sharpen the work itself" },
-      { value: "leadership", label: "Move into leadership", hint: "Manager, EM, founder" },
-    ],
-  },
-  {
-    id: "level",
-    question: "How well do you know the area you want to grow in?",
-    helper: "Self-rated, gut feel. You can always adjust later.",
-    why: "This sets the depth of what we recommend, so you don't get sent back to lesson one when you're ready for chapter five.",
-    category: "Self-assessment",
-    type: "single",
-    options: [
-      { value: "beginner", label: "Beginner", hint: "Curious, fresh" },
-      { value: "intermediate", label: "Intermediate", hint: "Used it, room to grow" },
-      { value: "advanced", label: "Advanced", hint: "Deep enough to teach it" },
-    ],
-  },
-  {
-    id: "timePerWeek",
-    question: "Realistically, how much time will this get every week?",
-    helper: "Pick what survives a bad work week, not your best one.",
-    why: "We size recommendations to your real schedule. Plans that ignore your life don't get finished.",
-    category: "Capacity",
-    type: "single",
-    options: [
-      { value: "<2", label: "Less than 2 hrs/week" },
-      { value: "2-5", label: "2 to 5 hrs/week" },
-      { value: "5-10", label: "5 to 10 hrs/week" },
-      { value: "10+", label: "10+ hrs/week" },
-    ],
-  },
-  {
-    id: "interests",
-    question: "Which tracks are pulling you?",
-    helper: "Up to 3. If everything sounds interesting, pick the ones you'd actually open on a Sunday.",
-    why: "We narrow from here. Fewer choices usually means a sharper recommendation.",
-    category: "Interests",
-    type: "multi",
-    options: [
-      { value: "frontend", label: "Frontend" },
-      { value: "backend", label: "Backend" },
-      { value: "fullstack", label: "Fullstack" },
-      { value: "devops", label: "DevOps / Cloud" },
-      { value: "data-analyst", label: "Data analyst" },
-      { value: "data-scientist", label: "Data scientist" },
-      { value: "ai-engineer", label: "AI engineer" },
-      { value: "ml-engineer", label: "ML engineer" },
-      { value: "pm", label: "Product management" },
-      { value: "designer", label: "Design / UX" },
-      { value: "em", label: "Engineering management" },
-      { value: "staff-engineer", label: "Staff / IC leadership" },
-      { value: "marketing", label: "Marketing" },
-      { value: "growth", label: "Growth" },
-      { value: "sales", label: "Sales" },
-      { value: "customer-success", label: "Customer success" },
-      { value: "finance", label: "Finance & FinTech" },
-      { value: "hr", label: "HR & People" },
-      { value: "project-management", label: "Project management" },
-      { value: "consulting", label: "Consulting & strategy" },
-      { value: "content-writing", label: "Content & writing" },
-      { value: "cybersecurity", label: "Cybersecurity" },
-    ],
-  },
-];
+// /assess: four steps (addendum-ai). 1 Situation, in their own words; 2 Time;
+// 3 Budget; 4 Check, where they confirm what Ascend understood. The
+// understand call starts the moment they leave step 1, so it runs while they
+// answer time and budget. ?example=1|2|3 fills in an example and jumps to
+// Check. Each step forward is a browser history entry, so the phone's back
+// gesture goes back one question, and a reload stays on the same step. Edits
+// on Check are kept for the tab in sessionStorage until "Looks right".
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
 
-export default function Assess() {
-  const router = useRouter();
-  const [profile, setProfile] = useProfile();
-  const [stepIdx, setStepIdx] = useState(0);
+const STEPS = ["Situation", "Time", "Budget", "Check"] as const;
+type StepIndex = 0 | 1 | 2 | 3;
+const CHECK: StepIndex = 3;
 
-  const step = STEPS[stepIdx];
-  const value = profile[step.id];
+/** The longest the Check step waits for the understanding before switching to manual controls. */
+const CHECK_WAIT_MS = 30_000;
 
-  function next() {
-    if (stepIdx < STEPS.length - 1) setStepIdx((s) => s + 1);
-    else router.push("/recommendations");
+/** Unconfirmed Check edits for this tab: { key: situationKey(text), edits }. */
+const CHECK_EDITS_KEY = "ascend.check.v1";
+
+// History -------------------------------------------------------------------------
+
+/** What each /assess history entry carries, next to Next's own state. */
+type StepEntry = { ascendStep: StepIndex; ascendFlow: string; ascendPushed: boolean };
+
+function isStep(v: unknown): v is StepIndex {
+  return v === 0 || v === 1 || v === 2 || v === 3;
+}
+
+/** The step stored on a history entry for this flow, or null. */
+function stepFromHistory(state: unknown, flow: string): StepIndex | null {
+  if (!state || typeof state !== "object") return null;
+  const e = state as Partial<StepEntry>;
+  return e.ascendFlow === flow && isStep(e.ascendStep) ? e.ascendStep : null;
+}
+
+/** Writes the step onto the current entry, or onto a new one. No URL: ?example and ?edit stay. */
+function writeStep(step: StepIndex, flow: string, mode: "push" | "replace") {
+  if (typeof window === "undefined") return;
+  if (mode === "push") {
+    const entry: StepEntry = { ascendStep: step, ascendFlow: flow, ascendPushed: true };
+    window.history.pushState(entry, "");
+  } else {
+    const prev = window.history.state as Partial<StepEntry> | null;
+    const entry: StepEntry = { ascendStep: step, ascendFlow: flow, ascendPushed: prev?.ascendPushed === true };
+    window.history.replaceState({ ...(prev ?? {}), ...entry }, "");
   }
-  function back() {
-    if (stepIdx > 0) setStepIdx((s) => s - 1);
-    else router.push("/");
+}
+
+/** The furthest step the answers allow: Time needs a situation, Budget needs hours, Check needs a budget. */
+function furthestStep(text: string, hours: Hours | null, budget: Budget | null): StepIndex {
+  if (cleanSituation(text).length < LIMITS.situationMin) return 0;
+  if (hours === null) return 1;
+  if (budget === null) return 2;
+  return CHECK;
+}
+
+// Check edits (sessionStorage) ----------------------------------------------------
+
+function readCheckEdits(text: string): ProfileEdits | null {
+  try {
+    const raw = sessionStorage.getItem(CHECK_EDITS_KEY);
+    const v = raw ? (JSON.parse(raw) as { key?: unknown; edits?: unknown }) : null;
+    return v && v.key === situationKey(text) && v.edits && typeof v.edits === "object"
+      ? (v.edits as ProfileEdits)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCheckEdits(text: string, check: CheckState) {
+  try {
+    sessionStorage.setItem(CHECK_EDITS_KEY, JSON.stringify({ key: situationKey(text), edits: editsFrom(check) }));
+  } catch {
+    // storage blocked: the edits still live in memory for this visit
+  }
+}
+
+function clearCheckEdits() {
+  try {
+    sessionStorage.removeItem(CHECK_EDITS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// State --------------------------------------------------------------------------
+
+type Understand =
+  | { status: "idle" }
+  | { status: "pending"; text: string }
+  | { status: "done"; text: string; response: UnderstandResponse };
+
+type State = {
+  step: StepIndex;
+  /** the textarea, as typed */
+  text: string;
+  hours: Hours | null;
+  /** "text" when prefilled from hours they wrote, until they choose */
+  hoursFrom: "user" | "text" | null;
+  /** the number they wrote, for the prefill note */
+  hoursSaid: number | null;
+  budget: Budget | null;
+  und: Understand;
+  check: CheckState | null;
+};
+
+type Action =
+  | { type: "text"; text: string }
+  | { type: "hours"; hours: Hours }
+  | { type: "budget"; budget: Budget }
+  | { type: "step"; step: StepIndex }
+  /** browser Back or Forward landed on this step (already capped to the answers) */
+  | { type: "goto"; step: StepIndex }
+  /** leaving step 1 with this cleaned text */
+  | { type: "leave-situation"; text: string }
+  | { type: "understood"; text: string; response: UnderstandResponse; saved: ProfileDraft | null }
+  | { type: "check"; check: CheckState };
+
+/** Hours they wrote, as a chip, unless they already chose one. */
+function prefillHours(s: State, said: number | null): State {
+  if (s.hoursFrom === "user") return s;
+  const chip = snapHours(said);
+  if (chip) return { ...s, hours: chip, hoursFrom: "text", hoursSaid: said };
+  if (s.hoursFrom === "text") return { ...s, hours: null, hoursFrom: null, hoursSaid: null };
+  return s;
+}
+
+function reducer(s: State, a: Action): State {
+  switch (a.type) {
+    case "text":
+      return { ...s, text: a.text };
+    case "hours":
+      return { ...s, hours: a.hours, hoursFrom: "user", hoursSaid: null };
+    case "budget":
+      return { ...s, budget: a.budget };
+    case "step":
+      return { ...s, step: a.step };
+    case "goto": {
+      // past step 1 the situation is read, the same as pressing Continue
+      if (a.step === 0) return { ...s, step: 0 };
+      return { ...reducer(s, { type: "leave-situation", text: cleanSituation(s.text) }), step: a.step };
+    }
+    case "leave-situation": {
+      const same = s.und.status !== "idle" && s.und.text === a.text;
+      const next = same ? s : { ...s, und: { status: "pending" as const, text: a.text }, check: null };
+      // code reads written hours at once; the AI's reading may refine it
+      return same ? next : prefillHours(next, hoursFromText(a.text));
+    }
+    case "understood": {
+      if (s.und.status === "idle" || s.und.text !== a.text) return s;
+      const u = a.response.understanding;
+      const next: State = {
+        ...s,
+        und: { status: "done", text: a.text, response: a.response },
+        check: checkStateFrom(u, a.saved),
+      };
+      return u.hoursChip ? prefillHours(next, u.hoursMentioned ?? u.hoursChip) : next;
+    }
+    case "check":
+      return { ...s, check: a.check };
+  }
+}
+
+/** ?example=1, 2 or 3 (or an example id). */
+function exampleFromParam(v: string | null): ExampleProfile | null {
+  if (!v) return null;
+  if (/^[1-9]$/.test(v)) return EXAMPLES[Number(v) - 1] ?? null;
+  return exampleById(v);
+}
+
+/**
+ * The saved draft when it belongs to this same situation, so earlier fixes
+ * come back, with this tab's unconfirmed Check edits on top. The edits never
+ * go into the saved profile: "Looks right" stays the only way in.
+ */
+function savedFor(text: string): ProfileDraft | null {
+  const d = loadProfile();
+  const draft = typeof d.situation === "string" && cleanSituation(d.situation) === text ? d : null;
+  const edits = readCheckEdits(text);
+  if (!edits) return draft;
+  // a baseline belongs to its move: none chosen yet means none, not the draft's old one
+  return { ...(draft ?? { situation: text }), ...edits, baseline: edits.baseline };
+}
+
+/**
+ * "Edit answers" from the pick (/assess?edit=1): a complete saved draft opens
+ * on Check, with what was understood and the user's own fixes; anything less
+ * starts at step 1 as usual.
+ */
+function editStart(): State | null {
+  const d = loadProfile();
+  if (typeof d.situation !== "string" || !isHours(d.hoursPerWeek) || !isBudget(d.budget)) return null;
+  const text = cleanSituation(d.situation);
+  if (text.length < LIMITS.situationMin) return null;
+  return {
+    step: CHECK,
+    text: d.situation.slice(0, LIMITS.situationMax),
+    hours: d.hoursPerWeek,
+    hoursFrom: "user",
+    hoursSaid: null,
+    budget: d.budget,
+    und: { status: "pending", text },
+    check: null,
+  };
+}
+
+/** Where this visit starts, before a reload's saved step is applied. */
+function firstState({ example, edit }: { example: ExampleProfile | null; edit: boolean }): State {
+  if (!example && edit) {
+    const s = editStart();
+    if (s) return s;
+  }
+  if (example) {
+    return {
+      step: CHECK,
+      text: example.situation,
+      hours: example.hoursPerWeek,
+      hoursFrom: "user",
+      hoursSaid: null,
+      budget: example.budget,
+      und: { status: "pending", text: cleanSituation(example.situation) },
+      check: null,
+    };
+  }
+  const d = loadProfile();
+  return {
+    step: 0,
+    text: typeof d.situation === "string" ? d.situation.slice(0, LIMITS.situationMax) : "",
+    hours: isHours(d.hoursPerWeek) ? d.hoursPerWeek : null,
+    hoursFrom: isHours(d.hoursPerWeek) ? "user" : null,
+    hoursSaid: null,
+    budget: isBudget(d.budget) ? d.budget : null,
+    und: { status: "idle" },
+    check: null,
+  };
+}
+
+/**
+ * The first state, then the step a reload (or Back from the pick) left on this
+ * history entry, capped to what the saved answers allow.
+ */
+function init(args: { example: ExampleProfile | null; edit: boolean; flow: string }): State {
+  const s = firstState(args);
+  const saved = typeof window === "undefined" ? null : stepFromHistory(window.history.state, args.flow);
+  if (saved === null || saved === s.step) return s;
+  const step = Math.min(saved, furthestStep(s.text, s.hours, s.budget)) as StepIndex;
+  return reducer(s, { type: "goto", step });
+}
+
+type Req = { text: string; ctrl: AbortController };
+
+/**
+ * Starts POST /api/understand for this text unless it's already running or
+ * done. A cached answer comes back at once; failures come back as the rules
+ * reading (lib/ai-client), never as an error.
+ */
+function requestUnderstanding(ref: RefObject<Req | null>, text: string, dispatch: Dispatch<Action>) {
+  if (ref.current?.text === text) return;
+  ref.current?.ctrl.abort();
+  const ctrl = new AbortController();
+  ref.current = { text, ctrl };
+  void loadUnderstanding(text, { signal: ctrl.signal }).then(({ response }) => {
+    if (ctrl.signal.aborted) return;
+    dispatch({ type: "understood", text, response, saved: savedFor(text) });
+  });
+}
+
+// Page ---------------------------------------------------------------------------
+
+const noopSubscribe = () => () => {};
+
+function Blank() {
+  return <main className="min-h-screen bg-background" />;
+}
+
+export default function AssessPage() {
+  return (
+    <Suspense fallback={<Blank />}>
+      <AssessGate />
+    </Suspense>
+  );
+}
+
+/** Waits for the browser (the draft lives in localStorage), then mounts the flow keyed by the example. */
+function AssessGate() {
+  const params = useSearchParams();
+  const example = exampleFromParam(params.get("example"));
+  const edit = params.get("edit") === "1";
+  const ready = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+  if (!ready) return <Blank />;
+  const flow = example?.id ?? (edit ? "edit" : "own");
+  return <Assess key={flow} flow={flow} example={example} edit={edit} />;
+}
+
+function Assess({ flow, example, edit }: { flow: string; example: ExampleProfile | null; edit: boolean }) {
+  const router = useRouter();
+  const currency = useDisplayCurrency();
+  const reduced = useReducedMotion();
+  const [s, dispatch] = useReducer(reducer, { example, edit, flow }, init);
+  const [storageOk] = useState(() => storageWorks());
+  const reqRef = useRef<Req | null>(null);
+  const stateRef = useRef(s);
+  const exampleText = example ? cleanSituation(example.situation) : null;
+
+  useEffect(() => {
+    stateRef.current = s;
+  });
+
+  // Whenever a reading is pending (an example, "Edit answers", a reload past
+  // step 1, Back or Forward), make sure its understand call is running. A
+  // cached answer comes back at once. No abort on cleanup: a second run in
+  // development finds it already running, and an answer that lands after
+  // unmount is simply dropped.
+  const pendingText = s.und.status === "pending" ? s.und.text : null;
+  useEffect(() => {
+    if (pendingText) requestUnderstanding(reqRef, pendingText, dispatch);
+  }, [pendingText]);
+
+  // This history entry carries the step it opened on, so Back from a later
+  // step, or from the pick, returns here.
+  useEffect(() => {
+    if (stepFromHistory(window.history.state, flow) !== stateRef.current.step) {
+      writeStep(stateRef.current.step, flow, "replace");
+    }
+  }, [flow]);
+
+  // Browser Back and Forward move between steps, capped to what's answered.
+  useEffect(() => {
+    function onPop(e: PopStateEvent) {
+      const want = stepFromHistory(e.state, flow);
+      if (want === null) return; // another page or flow; the router handles it
+      const cur = stateRef.current;
+      const step = Math.min(want, furthestStep(cur.text, cur.hours, cur.budget)) as StepIndex;
+      if (step !== want) writeStep(step, flow, "replace");
+      dispatch({ type: "goto", step });
+      window.scrollTo({ top: 0 });
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [flow]);
+
+  // On Check, wait at most 10 s, then fall back to manual controls.
+  useEffect(() => {
+    if (s.step !== CHECK || s.und.status !== "pending") return;
+    const text = s.und.text;
+    const timer = setTimeout(() => {
+      reqRef.current?.ctrl.abort();
+      dispatch({
+        type: "understood",
+        text,
+        response: rulesUnderstandResponse(text, "unavailable"),
+        saved: savedFor(text),
+      });
+    }, CHECK_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [s.step, s.und]);
+
+  const cleaned = cleanSituation(s.text);
+  const inExample = !!example && cleaned === exampleText;
+  const response = s.und.status === "done" ? s.und.response : null;
+  const missing = s.check ? missingFor(s.check) : null;
+
+  /** Keeps the draft so a reload or "Edit answers" brings it back. Examples aren't saved until confirmed. */
+  function persist(patch: { text?: string; hours?: Hours; budget?: Budget }) {
+    if (example) return;
+    const text = patch.text ?? s.text;
+    const stored = loadProfile();
+    const same =
+      typeof stored.situation === "string" && cleanSituation(stored.situation) === cleanSituation(text);
+    writeProfile({
+      ...(same ? stored : {}),
+      situation: text,
+      hoursPerWeek: patch.hours ?? s.hours ?? undefined,
+      budget: patch.budget ?? s.budget ?? undefined,
+    });
+  }
+
+  /** Forward pushes a history entry; going back in-app rewrites the current one. */
+  function go(step: StepIndex, mode: "push" | "replace" = "push") {
+    dispatch({ type: "step", step });
+    writeStep(step, flow, mode);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }
 
   function canAdvance(): boolean {
-    const v = profile[step.id];
-    if (step.type === "text") return typeof v === "string" && v.trim().length > 0;
-    if (step.type === "single") return typeof v === "string" && v.length > 0;
-    if (step.type === "multi") return Array.isArray(v) && v.length > 0;
-    return false;
+    if (s.step === 0) return cleaned.length >= LIMITS.situationMin;
+    if (s.step === 1) return s.hours !== null;
+    if (s.step === 2) return s.budget !== null;
+    return !!response && !!s.check && missing === null && s.hours !== null && s.budget !== null;
   }
 
-  function toggleMulti(opt: string) {
-    // Unselected chips are disabled once 3 are picked (see the cap below),
-    // so this only ever deselects or adds while under the cap.
-    const current = (profile.interests ?? []) as string[];
-    const next = current.includes(opt)
-      ? current.filter((c) => c !== opt)
-      : [...current, opt];
-    setProfile({ interests: next });
+  function next() {
+    if (!canAdvance()) return;
+    if (s.step === 0) {
+      dispatch({ type: "leave-situation", text: cleaned });
+      requestUnderstanding(reqRef, cleaned, dispatch);
+      go(1);
+    } else if (s.step === 1) {
+      go(2);
+    } else if (s.step === 2) {
+      // after a reload on Time or Budget the reading may not have started yet
+      if (s.und.status === "idle") dispatch({ type: "leave-situation", text: cleaned });
+      go(CHECK);
+    } else {
+      confirm();
+    }
+  }
+
+  function back() {
+    if (s.step === 0) {
+      router.push("/");
+      return;
+    }
+    // an entry this page pushed: the browser's Back, so both stay in step
+    const h = window.history.state as Partial<StepEntry> | null;
+    if (h?.ascendPushed && stepFromHistory(h, flow) === s.step) window.history.back();
+    else go((s.step - 1) as StepIndex, "replace");
+  }
+
+  function confirm() {
+    if (s.und.status !== "done" || !s.check || s.hours === null || s.budget === null) return;
+    const { text, response: r } = s.und;
+    const profile = profileFromUnderstanding({
+      situation: text,
+      understanding: r.understanding,
+      engine: r.engine,
+      hoursPerWeek: s.hours,
+      budget: s.budget,
+      edits: editsFrom(s.check),
+    });
+    if (!profile) return;
+    saveProfile(profile);
+    clearCheckEdits();
+    trackMilestone("understood", situationKey(text));
+    router.push("/recommendations");
+  }
+
+  function resetToOwn() {
+    reqRef.current?.ctrl.abort();
+    router.replace("/assess");
+  }
+
+  // Check step header, by phase
+  const phase: "loading" | "ai" | "rules" = !response ? "loading" : isAiEngine(response.engine) ? "ai" : "rules";
+
+  let hint: string | null = null;
+  if (s.step === CHECK && phase !== "loading") {
+    if (missing === "move") hint = "Choose a direction to continue.";
+    else if (missing === "baseline") hint = "Choose a starting point to continue.";
   }
 
   return (
@@ -160,14 +508,14 @@ export default function Assess() {
         <header className="py-5 flex items-center justify-between">
           <button
             onClick={back}
-            aria-label={stepIdx === 0 ? "Back to home" : "Previous question"}
-            className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
+            aria-label={s.step === 0 ? "Back to home" : "Previous question"}
+            className="flex items-center gap-1.5 min-h-10 text-sm text-muted hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
           <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
-            Step {stepIdx + 1} of {STEPS.length} <span className="text-muted-2">·</span> {step.category}
+            Step {s.step + 1} of {STEPS.length} <span className="text-muted-2">·</span> {STEPS[s.step]}
           </div>
         </header>
 
@@ -176,155 +524,207 @@ export default function Assess() {
           <motion.div
             className="h-full bg-foreground"
             initial={false}
-            animate={{ width: `${((stepIdx + 1) / STEPS.length) * 100}%` }}
+            animate={{ width: `${((s.step + 1) / STEPS.length) * 100}%` }}
             transition={{ duration: 0.5, ease: easeOut }}
           />
         </div>
 
+        {!storageOk && (
+          <p className="mt-4 text-[12.5px] leading-relaxed text-muted-2">
+            This browser isn&apos;t saving, so finish in one go and keep the plan link.
+          </p>
+        )}
+
+        {inExample && example && (
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+            <span className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2 leading-relaxed">
+              {"// Example answers · "}
+              {example.label}
+            </span>
+            <TextLink onClick={resetToOwn} className="self-start sm:self-auto flex-shrink-0">
+              Use my own answers
+            </TextLink>
+          </div>
+        )}
+
         {/* Question */}
-        <section className="flex-1 flex flex-col justify-start mt-10">
+        <section className={`flex-1 flex flex-col justify-start ${inExample ? "mt-8" : "mt-10"} pb-6`}>
           <AnimatePresence mode="wait">
             <motion.div
-              key={step.id as string}
-              initial={{ opacity: 0, y: 16 }}
+              key={s.step}
+              initial={{ opacity: 0, y: reduced ? 0 : 16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0, y: reduced ? 0 : -8 }}
               transition={{ duration: 0.35, ease: easeOut }}
             >
-              <h1 className="text-[1.75rem] leading-[1.2] tracking-[-0.01em] font-semibold text-foreground">
-                {step.question}
-              </h1>
-              {step.helper && (
-                <p className="mt-2 text-muted text-sm">{step.helper}</p>
-              )}
-              <p className="mt-3 text-muted-2 text-[12.5px] leading-relaxed">
-                {step.why}
-              </p>
-
-              <div className="mt-7">
-                {step.type === "text" && (
-                  <input
-                    type="text"
-                    value={(value as string) ?? ""}
-                    onChange={(e) =>
-                      setProfile({ [step.id]: e.target.value } as Partial<Profile>)
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && canAdvance()) next();
-                    }}
-                    placeholder="e.g. Early-career frontend engineer at a startup"
-                    maxLength={200}
-                    autoFocus
-                    className="w-full bg-card-alt rounded-2xl px-4 py-3.5 text-foreground placeholder:text-muted-2 text-base outline-none border border-transparent focus:border-foreground transition-colors"
+              {s.step === 0 && (
+                <>
+                  <StepHead
+                    title="Where are you now, and where do you want to grow?"
+                    helper="A few sentences in your own words. What you do, where you want to be, what you've tried."
+                    why="Ascend's AI reads this for your direction, what you already have and the gaps to close. You'll check what it understood before anything is chosen."
                   />
-                )}
+                  <div className="mt-7">
+                    <SituationInput
+                      value={s.text}
+                      onChange={(text) => {
+                        dispatch({ type: "text", text });
+                        persist({ text });
+                      }}
+                      onSubmit={next}
+                      autoFocus={s.text.length === 0}
+                    />
+                  </div>
+                </>
+              )}
 
-                {step.type === "single" && (
-                  <div className="flex flex-col gap-2">
-                    {step.options!.map((o) => {
-                      const selected = value === o.value;
-                      return (
-                        <motion.button
-                          key={o.value}
-                          aria-pressed={selected}
-                          onClick={() =>
-                            setProfile({ [step.id]: o.value } as Partial<Profile>)
+              {s.step === 1 && (
+                <>
+                  <StepHead
+                    title="How many hours a week can you give this?"
+                    helper="Pick what survives a bad work week, not your best one."
+                    why="Ascend plans at 70% of this, because most weeks run short. That's its own rule of thumb, not a study."
+                  />
+                  <div className="mt-7 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {HOURS.map((h) => (
+                      <OptionCard
+                        key={h}
+                        selected={s.hours === h}
+                        onClick={() => {
+                          dispatch({ type: "hours", hours: h });
+                          persist({ hours: h });
+                        }}
+                        label={hoursChipLabel(h)}
+                      />
+                    ))}
+                  </div>
+                  {s.hoursFrom === "text" && s.hoursSaid !== null && (
+                    <p className="mt-4 text-[12.5px] leading-relaxed text-muted-2">
+                      Set from what you wrote: {s.hoursSaid} {s.hoursSaid === 1 ? "hour" : "hours"} a week.
+                      Change it if a bad week has less.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {s.step === 2 && (
+                <>
+                  <StepHead
+                    title="What can you spend on this?"
+                    helper="You'll see the real price and any free way to start either way."
+                    why="The cap covers every month at your pace for the part you'd start with. Code checks it before any AI runs."
+                  />
+                  <div className="mt-7 flex flex-col gap-2">
+                    {BUDGETS.map((b) => (
+                      <OptionCard
+                        key={b}
+                        selected={s.budget === b}
+                        onClick={() => {
+                          dispatch({ type: "budget", budget: b });
+                          persist({ budget: b });
+                        }}
+                        label={budgetLabel(b, currency)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {s.step === CHECK && (
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={phase}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3, ease: easeOut }}
+                  >
+                    {phase === "loading" && (
+                      <>
+                        <StepHead
+                          title={
+                            <>
+                              {UNDERSTAND_LOADING}
+                              <BlinkCaret />
+                            </>
                           }
-                          whileHover={{ y: -1 }}
-                          whileTap={{ scale: 0.985 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                          className={`text-left rounded-2xl px-4 py-3.5 border ${
-                            selected
-                              ? "border-foreground bg-foreground text-accent-fg shadow-[0_2px_10px_-4px_rgba(0,0,0,0.18)]"
-                              : "border-border bg-card hover:border-foreground/30 hover:shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className={`text-[15px] font-medium ${selected ? "" : "text-foreground"}`}>
-                                {o.label}
-                              </div>
-                              {o.hint && (
-                                <div className={`text-xs mt-0.5 ${selected ? "text-accent-fg/70" : "text-muted"}`}>
-                                  {o.hint}
-                                </div>
-                              )}
-                            </div>
-                            <motion.div
-                              animate={selected ? { scale: 1 } : { scale: 0.9 }}
-                              transition={{ type: "spring", stiffness: 500, damping: 22 }}
-                              className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border ${
-                                selected
-                                  ? "border-accent-fg bg-accent-fg"
-                                  : "border-border"
-                              }`}
-                            >
-                              <AnimatePresence>
-                                {selected && (
-                                  <motion.span
-                                    initial={{ scale: 0, rotate: -90 }}
-                                    animate={{ scale: 1, rotate: 0 }}
-                                    exit={{ scale: 0 }}
-                                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                                  >
-                                    <Check className="w-3 h-3 text-foreground" />
-                                  </motion.span>
-                                )}
-                              </AnimatePresence>
-                            </motion.div>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                )}
+                          helper="Your direction, starting point, strengths and gaps, read from your words."
+                        />
+                        <div className="mt-7" aria-live="polite">
+                          <span className="sr-only">{UNDERSTAND_LOADING}</span>
+                          <UnderstandingSkeleton />
+                        </div>
+                      </>
+                    )}
 
-                {step.type === "multi" && (
-                  <div className="flex flex-wrap gap-2">
-                    {step.options!.map((o) => {
-                      const arr = (profile.interests as string[]) ?? [];
-                      const selected = arr.includes(o.value);
-                      const atCap = arr.length >= 3 && !selected;
-                      return (
-                        <motion.button
-                          key={o.value}
-                          aria-pressed={selected}
-                          disabled={atCap}
-                          onClick={() => toggleMulti(o.value)}
-                          whileHover={atCap ? undefined : { y: -1 }}
-                          whileTap={atCap ? undefined : { scale: 0.94 }}
-                          transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                          className={`rounded-full px-3.5 py-2 text-sm border transition-opacity ${
-                            selected
-                              ? "bg-foreground text-accent-fg border-foreground"
-                              : atCap
-                                ? "bg-card text-muted border-border opacity-40 cursor-not-allowed"
-                                : "bg-card text-foreground border-border hover:border-foreground/30"
-                          }`}
-                        >
-                          {o.label}
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                    {phase !== "loading" && response && s.check && (
+                      <>
+                        <StepHead
+                          title={phase === "ai" ? "Here's what Ascend understood." : "Set your direction."}
+                          helper={
+                            phase === "ai"
+                              ? "Nothing is chosen until you say it looks right."
+                              : "A few quick choices. Ascend still uses what you wrote."
+                          }
+                          why={
+                            <EngineLine>
+                              {understandEngineLine({
+                                engine: response.engine,
+                                model: response.model,
+                                words: response.words,
+                                reason: response.reason,
+                              })}
+                            </EngineLine>
+                          }
+                        />
+                        <div className="mt-7">
+                          <Understanding
+                            response={response}
+                            state={s.check}
+                            onChange={(check) => {
+                              dispatch({ type: "check", check });
+                              // examples aren't saved until confirmed
+                              if (!example && s.und.status === "done") writeCheckEdits(s.und.text, check);
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </motion.div>
           </AnimatePresence>
         </section>
 
         {/* Footer CTA */}
         <footer className="py-5 sticky bottom-0 bg-background">
+          {hint && <p className="mb-3 text-center text-[12.5px] text-muted-2">{hint}</p>}
           <button
             onClick={next}
             disabled={!canAdvance()}
             className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl py-3.5 font-medium text-[15px] disabled:opacity-25 disabled:cursor-not-allowed transition-opacity"
           >
-            {stepIdx === STEPS.length - 1 ? "See my picks" : "Continue"}
+            {s.step === CHECK ? "Looks right. Show my pick" : "Continue"}
             <ArrowRight className="w-4 h-4" />
           </button>
         </footer>
       </div>
     </main>
+  );
+}
+
+function StepHead({ title, helper, why }: { title: ReactNode; helper?: string; why?: ReactNode }) {
+  return (
+    <>
+      <h1 className="text-[1.75rem] leading-[1.2] tracking-[-0.01em] font-semibold text-foreground">{title}</h1>
+      {helper && <p className="mt-2 text-muted text-sm">{helper}</p>}
+      {why &&
+        (typeof why === "string" ? (
+          <p className="mt-3 text-muted-2 text-[12.5px] leading-relaxed">{why}</p>
+        ) : (
+          <div className="mt-3">{why}</div>
+        ))}
+    </>
   );
 }

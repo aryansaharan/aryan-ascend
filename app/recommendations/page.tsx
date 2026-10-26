@@ -1,554 +1,657 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { AdjustChips } from "@/components/AdjustChips";
+import { Alternates, type AlternateRow } from "@/components/Alternates";
+import { CheckAnother } from "@/components/CheckAnother";
+import { DecisionPanel } from "@/components/DecisionPanel";
+import { MentionedCourses } from "@/components/MentionedCourses";
+import { PickCard } from "@/components/PickCard";
+import { RepickNote, type RepickStatus } from "@/components/RepickNote";
+import { RulesVsAi } from "@/components/RulesVsAi";
+import { WorkLedger } from "@/components/WorkLedger";
+import { matchFor } from "@/lib/skills";
 import {
-  ArrowLeft,
-  ArrowRight,
-  ExternalLink,
-  Loader2,
-  Send,
-  Sparkles,
-} from "lucide-react";
-import { experimental_useObject as useObject, useCompletion } from "@ai-sdk/react";
-import { useProfile } from "@/lib/store";
-import { recommend, type Profile, type Recommendation } from "@/lib/recommend";
-import { picksSchema } from "@/lib/recommend-schema";
-import { enrichPicks } from "@/lib/enrich";
+  BlinkCaret,
+  Card,
+  EngineLine,
+  Reveal,
+  SectionLabel,
+  SkeletonLine,
+  TextLink,
+} from "@/components/ui";
+import { profileForExample, getUnderstanding } from "@/lib/ai-client";
+import { courseById } from "@/lib/catalog";
 import {
-  cacheRecommendations,
-  readCachedRecommendations,
-} from "@/lib/recommend-client";
-import { SaveSessionStub } from "@/components/SaveSessionStub";
+  MAX_REPICKS,
+  adjustDecision,
+  getLatestDecision,
+  loadDecision,
+  pruneForFreshStart,
+  repicksUsed,
+  repickWithNote,
+  resetDecision,
+  setChosen,
+  shouldRetryAi,
+  swapDecision,
+} from "@/lib/decision-store";
+import { exampleById, exampleFor, type ExampleProfile } from "@/lib/examples";
+import {
+  closestRuledOut,
+  fit,
+  funnelStages,
+  rankedPassing,
+  relaxations,
+  type Candidate,
+  type Relaxation,
+} from "@/lib/fit";
+import { budgetPhrase, hoursAWeek } from "@/lib/format";
+import { useDisplayCurrency } from "@/lib/hooks";
+import { trackMilestone } from "@/lib/metrics";
+import { MOVES } from "@/lib/moves";
+import { isAiEngine, type CandidateCoverage, type Decision } from "@/lib/pick-types";
+import {
+  adjustedChipNames,
+  defaultAdjust,
+  normalizeProfile,
+  toggleChip,
+  type Adjust,
+  type AdjustChip,
+  type ProfileV2,
+} from "@/lib/profile";
+import { keywordCoverage } from "@/lib/skills";
+import { candidateCoverage } from "@/lib/decide-rules";
+import { clearSession, readProfile, saveProfile, writeProfile } from "@/lib/store";
+import {
+  GAP_NOTE_TEMPLATE,
+  UNDERSTAND_LOADING,
+  readBackLine,
+  weakFitNote,
+} from "@/lib/templates";
 
-const easeOut = [0.16, 1, 0.3, 1] as const;
+// "Your pick" (spec 3.3, addendum-ai "Showing the work"). Rules run in the
+// browser first and the funnel shows them; then one POST /api/pick lets the AI
+// match modules to the person's gaps and choose; any failure falls back to the
+// same rules locally. The pick card, the gap coverage and the receipt come
+// first; everything else is calm and secondary. Chips and swaps never call
+// the network.
 
-function fitLabel(score: number): string {
-  if (score >= 80) return "Strong fit";
-  if (score >= 50) return "Good fit";
-  return "Stretch";
+const noopSubscribe = () => () => {};
+/** Ruled-out entries listed under "Left out, and why" (spec 3.3: up to 4). */
+const LEFT_OUT_SHOWN = 4;
+const onClient = () => true;
+const onServer = () => false;
+
+type Start =
+  | { kind: "example"; example: ExampleProfile }
+  | { kind: "missing" }
+  | { kind: "profile"; profile: ProfileV2; cached: Decision | null };
+
+type Session = {
+  profile: ProfileV2;
+  decision: Decision | null;
+  /** a fresh request is behind this view: the funnel plays */
+  fresh: boolean;
+  /** bumps for every fresh request, so stale answers are dropped */
+  loadId: number;
+  /** adjust and exclude of the request in flight */
+  pending: { adjust: Adjust; exclude: string[] };
+};
+
+function initialSession(start: Start | null): Session | null {
+  if (start?.kind !== "profile") return null;
+  return {
+    profile: start.profile,
+    decision: start.cached,
+    fresh: start.cached === null,
+    loadId: 0,
+    pending: { adjust: defaultAdjust(start.profile), exclude: [] },
+  };
 }
 
-const REQUIRED: (keyof Profile)[] = [
-  "currentRole",
-  "experience",
-  "goal",
-  "level",
-  "timePerWeek",
-  "interests",
-];
-
-export default function Recommendations() {
+export default function YourPick() {
   const router = useRouter();
-  const [profile, , profileReady] = useProfile();
+  const ready = useSyncExternalStore(noopSubscribe, onClient, onServer);
+  const currency = useDisplayCurrency();
+  const reduced = useReducedMotion() ?? false;
 
-  const submittedRef = useRef(false);
-  const fallbackRef = useRef(false);
-  const engineRef = useRef<"ai" | "deterministic">("ai");
-  const profileRef = useRef(profile);
-  const [engine, setEngine] = useState<"ai" | "deterministic">("ai");
-  const [fallback, setFallback] = useState<Recommendation[] | null>(null);
-  const [recovering, setRecovering] = useState(false);
+  // Where the page starts, read once in the browser.
+  const start = useMemo<Start | null>(() => {
+    if (!ready) return null;
+    const ex = exampleById(new URLSearchParams(window.location.search).get("example"));
+    if (ex) return { kind: "example", example: ex };
+    const profile = readProfile();
+    if (!profile) return { kind: "missing" };
+    return { kind: "profile", profile, cached: getLatestDecision(profile) };
+  }, [ready]);
 
-  // Keep the latest profile in a ref so the hook callbacks never read a stale
-  // value, without mutating a ref during render.
+  const [override, setOverride] = useState<Session | null>(null);
+  const initial = useMemo(() => initialSession(start), [start]);
+  const session = override ?? initial;
+  const seq = useRef(0);
+  const [heldId, setHeldId] = useState<number | null>(null);
+  const [doneId, setDoneId] = useState<number | null>(null);
+  const [repick, setRepick] = useState<RepickStatus>({ kind: "idle" });
+
+  /** One fresh request: shows the funnel, then the answer (or the rules, on any failure). */
+  async function decide(profile: ProfileV2, adjust: Adjust, exclude: string[], signal?: AbortSignal) {
+    const id = ++seq.current;
+    setOverride({ profile, decision: null, fresh: true, loadId: id, pending: { adjust, exclude } });
+    const { decision } = await loadDecision({ profile, currency, adjust, exclude, signal });
+    if (signal?.aborted || seq.current !== id) return;
+    setOverride((s) => (s && s.loadId === id ? { ...s, decision } : s));
+  }
+
+  // No answers yet: back to the questions.
   useEffect(() => {
-    profileRef.current = profile;
-  });
+    if (start?.kind === "missing") router.replace("/assess");
+  }, [start, router]);
 
-  // Falls back to the local deterministic scorer. Used both when the request
-  // errors (onError) and when the live stream finishes without usable picks.
-  // A mid-stream provider error is swallowed by the SDK as an HTTP 200 with a
-  // truncated body, so onFinish (not onError) is usually where we catch it.
-  // Uses refs so it stays correct regardless of which render captured the hook
-  // callbacks.
-  const recoverDeterministic = () => {
-    if (fallbackRef.current) return;
-    fallbackRef.current = true;
-    setRecovering(true);
-    const p = profileRef.current as Profile;
-    recommend(p)
-      .then((recs) => {
-        engineRef.current = "deterministic";
-        setEngine("deterministic");
-        setFallback(recs);
-        cacheRecommendations(p, {
-          recommendations: recs,
-          engine: "deterministic",
-          readBack: "",
-        });
-      })
-      .finally(() => setRecovering(false));
-  };
+  // Saved answers without a decision: ask once. A saved rules answer from a
+  // failed AI call is asked again once it is a minute old; its card stays on
+  // screen meanwhile.
+  useEffect(() => {
+    if (start?.kind !== "profile") return;
+    const cached = start.cached;
+    if (cached && !shouldRetryAi(cached)) return;
+    const ctrl = new AbortController();
+    const id = seq.current;
+    loadDecision({
+      profile: start.profile,
+      currency,
+      ...(cached ? { adjust: cached.adjust, exclude: cached.exclude } : {}),
+      signal: ctrl.signal,
+    }).then(({ decision }) => {
+      if (ctrl.signal.aborted || seq.current !== id) return;
+      setOverride((s) => {
+        const base = s ?? initialSession(start);
+        return base ? { ...base, decision } : s;
+      });
+    });
+    return () => ctrl.abort();
+  }, [start, currency]);
 
-  const { object, submit, isLoading, error } = useObject({
-    api: "/api/recommend",
-    schema: picksSchema,
-    // Capture which engine answered (from the response header) without showing
-    // the model's name, and without a second request.
-    fetch: async (input, init) => {
-      const res = await fetch(input as RequestInfo, init);
-      const eng =
-        res.headers.get("x-ascend-engine") === "deterministic"
-          ? "deterministic"
-          : "ai";
-      engineRef.current = eng;
-      setEngine(eng);
-      return res;
-    },
-    onError: () => recoverDeterministic(),
-    onFinish: ({ object: final }) => {
-      if (fallbackRef.current) return;
-      const p = profileRef.current as Profile;
-      // If the finished object has no usable picks (strict validation failed, or
-      // a provider error truncated the stream into an HTTP 200), recover to the
-      // deterministic scorer so the page never dead-ends.
-      const recs = enrichPicks(final?.picks, p);
-      if (recs.length === 0) {
-        recoverDeterministic();
+  // ?example=id: read the example's situation with the real understand call,
+  // then decide fresh.
+  useEffect(() => {
+    if (start?.kind !== "example") return;
+    const ctrl = new AbortController();
+    const ex = start.example;
+    profileForExample(ex, { signal: ctrl.signal }).then(({ profile }) => {
+      if (ctrl.signal.aborted) return;
+      if (!profile) {
+        writeProfile({ situation: ex.situation, hoursPerWeek: ex.hoursPerWeek, budget: ex.budget });
+        router.replace("/assess");
         return;
       }
-      cacheRecommendations(p, {
-        recommendations: recs,
-        engine: engineRef.current,
-        readBack: final?.readBack ?? "",
-      });
-    },
-  });
-
-  const complete =
-    profileReady &&
-    REQUIRED.every((k) => {
-      const v = profile[k];
-      return v !== undefined && (Array.isArray(v) ? v.length > 0 : true);
+      saveProfile(profile);
+      pruneForFreshStart();
+      window.history.replaceState(null, "", "/recommendations");
+      void decide(normalizeProfile(profile), defaultAdjust(profile), [], ctrl.signal);
     });
+    return () => ctrl.abort();
+    // decide is recreated each render; this runs once per start
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start, router]);
 
-  // Coming back to this page (Back to picks, browser Back) with the same
-  // answers shows the shortlist already ranked for them, so it matches what
-  // /compare showed and doesn't pay for a second model call.
-  const cached = useMemo(() => {
-    if (!complete) return null;
-    const hit = readCachedRecommendations(profile as Profile);
-    return hit && hit.recommendations.length > 0 ? hit : null;
-  }, [complete, profile]);
+  const profile = session?.profile ?? null;
+  const decision = session?.decision ?? null;
+  const pending = session?.pending ?? null;
+  const adjust = decision?.adjust ?? pending?.adjust ?? null;
+  const exclude = useMemo(() => decision?.exclude ?? pending?.exclude ?? [], [decision, pending]);
 
-  useEffect(() => {
-    if (!profileReady) return;
-    if (!complete) {
-      router.replace("/assess");
-      return;
-    }
-    if (!submittedRef.current) {
-      submittedRef.current = true;
-      if (!cached) submit({ profile });
-    }
-  }, [profile, profileReady, complete, cached, router, submit]);
-
-  const readBack = cached?.readBack ?? object?.readBack ?? "";
-  const liveRecs = useMemo(
-    () =>
-      cached?.recommendations ??
-      fallback ??
-      enrichPicks(object?.picks, profile as Profile),
-    [cached, fallback, object, profile],
+  // The rules, in the browser: funnel, candidates, ruled-out list.
+  const result = useMemo(
+    () => (profile && adjust ? fit(profile, adjust, { currency, exclude }) : null),
+    [profile, adjust, currency, exclude],
   );
-  const shownEngine = cached?.engine ?? engine;
+  const passing = useMemo(
+    () => (profile && adjust ? rankedPassing(profile, adjust, { currency }) : []),
+    [profile, adjust, currency],
+  );
+  const stages = useMemo(() => (result && profile ? funnelStages(result, profile) : []), [result, profile]);
+  const understanding = useMemo(
+    () => (profile && ready ? getUnderstanding(profile.situation) : null),
+    [profile, ready],
+  );
 
-  const done = !isLoading || fallback !== null;
-  const showEmpty =
-    done &&
-    !recovering &&
-    liveRecs.length === 0 &&
-    (!!object || !!error || !!fallback);
+  const fresh = session?.fresh ?? false;
+  const animating = fresh && !reduced;
+  const shown = decision !== null && (!animating || doneId === session?.loadId);
+
+  // One /m/pick per decision rendered.
+  useEffect(() => {
+    if (shown && decision?.pickId) trackMilestone("pick", decision.key);
+  }, [shown, decision]);
+
+  const example = profile ? exampleFor(profile) : start?.kind === "example" ? start.example : null;
+
+  function candidateFor(id: string): Candidate | null {
+    return result?.candidates.find((c) => c.id === id) ?? passing.find((c) => c.id === id) ?? null;
+  }
+
+  function coverageFor(id: string): CandidateCoverage | null {
+    if (!decision || !profile) return null;
+    const hit = decision.coverage.find((c) => c.id === id);
+    if (hit) return hit;
+    const course = courseById(id);
+    const cand = candidateFor(id);
+    if (!course || decision.gaps.length === 0) return null;
+    return candidateCoverage(id, "keywords", keywordCoverage(course, decision.gaps, cand?.moduleCount));
+  }
+
+  function update(d: Decision, keepRepickNote = false) {
+    if (!session) return;
+    setOverride({ ...session, decision: d, fresh: false });
+    if (!keepRepickNote) setRepick({ kind: "idle" });
+  }
+
+  function onToggle(chip: AdjustChip) {
+    if (!decision || !profile) return;
+    // a level chip's exclusion lasts only while that chip is on
+    const next = toggleChip(
+      { adjust: decision.adjust, exclude: decision.exclude, levelExclude: decision.levelExclude },
+      chip,
+      decision.pickId,
+    );
+    update(adjustDecision(decision, profile, next.adjust, next.exclude, next.levelExclude));
+  }
+
+  /** Back to the first decision for these answers (the AI's, when it ran), swaps and hidden courses undone. */
+  function onReset() {
+    if (!decision || !profile) return;
+    update(resetDecision(decision, profile));
+  }
+
+  function onSwap(id: string) {
+    if (!decision || !profile) return;
+    update(swapDecision(decision, id, profile));
+  }
+
+  async function onRepick(note: string) {
+    if (!decision || !profile) return;
+    setRepick({ kind: "loading" });
+    const res = await repickWithNote(decision, profile, note, currency);
+    if (res.ok) {
+      update(res.decision, true);
+      setRepick({ kind: "ok", note: note.trim().slice(0, 200) });
+    } else {
+      setRepick(res.reason === "limit" ? { kind: "idle" } : { kind: "failed" });
+    }
+  }
+
+  function onRelax(r: Relaxation) {
+    if (!decision || !profile) return;
+    const next = normalizeProfile(
+      r.kind === "hours" ? { ...profile, hoursPerWeek: r.hoursPerWeek } : { ...profile, budget: r.budget },
+    );
+    const a = r.kind === "budget" ? { ...decision.adjust, cheaper: false } : decision.adjust;
+    saveProfile(next);
+    setRepick({ kind: "idle" });
+    void decide(next, a, decision.exclude);
+  }
+
+  function onBook() {
+    if (!decision?.pickId) return;
+    setChosen(decision, decision.pickId);
+    router.push("/plan");
+  }
+
+  // ------------------------------------------------------------------------
+
+  const pickCourse = decision?.pickId ? courseById(decision.pickId) : undefined;
+  const pickCandidate = decision?.pickId ? candidateFor(decision.pickId) : null;
+  const altRows: AlternateRow[] = (decision?.alternates ?? []).flatMap((alt) => {
+    const course = courseById(alt.id);
+    return course ? [{ alt, course, candidate: candidateFor(alt.id), coverage: coverageFor(alt.id) }] : [];
+  });
+  const adjustedNote = decision && profile ? adjustedChipNames(profile, decision.adjust) : "";
+  const canReset = Boolean(adjustedNote) || (decision?.exclude.length ?? 0) > 0;
+  // courses an earlier change keeps out that no pressed chip explains (a re-pick's, say)
+  const hidden = (decision?.exclude ?? [])
+    .filter((id) => id !== decision?.levelExclude)
+    .flatMap((id) => courseById(id)?.title ?? []);
+  // counted per set of answers in storage, so Reset or a reload doesn't hand out more
+  const repicksUsedNow = decision && profile ? Math.max(decision.repicks.length, repicksUsed(profile)) : 0;
+  const othersLeft = result && decision ? result.candidates.filter((c) => c.id !== decision.pickId).length : 0;
+  const showRepick = decision !== null && decision.pickId !== null && decision.reason !== "no-key" && othersLeft >= 2;
+  const rulesTitle = decision?.rulesPickId ? courseById(decision.rulesPickId)?.title ?? null : null;
+  const leftOut = (result?.ruledOut ?? []).slice(0, LEFT_OUT_SHOWN);
+  // the AI's own gaps, when its reading is still on this device, so the receipt credits it only with those
+  const aiGapIds =
+    understanding && isAiEngine(understanding.engine) ? understanding.understanding.gaps.map((g) => g.id) : null;
 
   return (
-    <main className="min-h-screen bg-background flex flex-col items-center">
-      <div className="w-full max-w-4xl mx-auto flex flex-col min-h-screen px-6 sm:px-10 lg:px-16">
+    <main className="min-h-screen bg-background">
+      <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 lg:px-16 pb-20 sm:pb-28">
         <header className="py-5 flex items-center justify-between">
-          <button
-            onClick={() => router.push("/assess")}
-            className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
+          <Link
+            href="/assess?edit=1"
+            aria-label="Back to your answers"
+            className="-my-2 inline-flex min-h-10 items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Adjust answers
-          </button>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted">
-            Your picks
-          </div>
+            <ArrowLeft aria-hidden className="w-4 h-4" />
+            Back
+          </Link>
         </header>
 
-        <section className="mt-6">
-          <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: easeOut }}
-            className="text-[1.75rem] sm:text-3xl leading-[1.15] tracking-[-0.01em] font-semibold text-foreground"
-          >
-            Your personalized recommendations
-          </motion.h1>
+        <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2 flex items-center gap-3 pt-2 sm:pt-6">
+          <span className="mono-label text-muted font-medium">{"// 02 YOUR PICK"}</span>
+          <span aria-hidden className="flex-1 h-px bg-border-soft" />
+        </div>
+        <h1 className="sr-only">Your pick</h1>
 
-          {/* Read-back: the advisor reflecting the user's own words back. This is
-              the live, per-person line that proves the answers were read. */}
-          <div className="mt-4 min-h-[1.5rem]">
-            {readBack ? (
-              <motion.p
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-foreground text-[15px] sm:text-base leading-relaxed border-l-2 border-foreground/40 pl-3.5"
-              >
-                {readBack}
-                {isLoading && <BlinkCaret />}
-              </motion.p>
-            ) : isLoading ? (
-              <div className="flex items-center gap-2.5 text-muted text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Reading your answers and lining up your matches
-              </div>
-            ) : null}
-          </div>
-
-          {done && liveRecs.length > 0 && (
-            <div className="mt-3 mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
-              {shownEngine === "ai"
-                ? "// Ranked by AI from your answers"
-                : "// Ranked by Ascend's matching engine"}
-            </div>
-          )}
-        </section>
-
-        <section className="mt-7 mb-8">
-          <AnimatePresence mode="popLayout">
-            {liveRecs.map((r, i) => (
-              <div key={r.course.id} className={i > 0 ? "mt-3" : ""}>
-                <RecCard rec={r} streaming={isLoading} />
-              </div>
-            ))}
-          </AnimatePresence>
-
-          {/* Placeholder while the first card is still forming, or while the
-              deterministic fallback is being computed. */}
-          {liveRecs.length === 0 &&
-            ((isLoading && readBack) || recovering) && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-muted">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Choosing your matches
-              </div>
-            )}
-
-          {showEmpty && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-card-alt rounded-2xl p-6"
+        {example && (
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
+              {"// Example answers · "}
+              {example.label}
+            </span>
+            <TextLink
+              href="/assess"
+              onClick={() => clearSession()}
+              className="text-[12.5px]"
             >
-              <p className="text-foreground">
-                Nothing matched strongly enough to recommend with confidence
-                based on what you told us. That happens. A small tweak to your
-                interests or time usually unlocks a better shortlist.
-              </p>
-              <button
-                onClick={() => router.push("/assess")}
-                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:gap-2 transition-all"
-              >
-                Adjust answers <ArrowRight className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-        </section>
-
-        {/* Ask-back advisor: a real second turn, grounded in these exact picks. */}
-        {done && liveRecs.length > 0 && (
-          <Advisor profile={profile as Profile} recs={liveRecs} />
+              Use my own answers
+            </TextLink>
+          </div>
         )}
 
-        {done && liveRecs.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: easeOut }}
-            className="mt-10 pb-8"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <Link
-                href="/assess"
-                className="text-xs text-muted hover:text-foreground transition-colors"
-              >
-                Refine your picks
-              </Link>
-              <SaveSessionStub />
-            </div>
-            <Link
-              href="/compare"
-              className="w-full inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl py-3.5 font-medium text-[15px]"
-            >
-              Compare top picks
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </motion.div>
+        {/* Reading an example's situation (the understand call) */}
+        {!profile && start?.kind === "example" && (
+          <Reveal className="mt-6">
+            <Card padded={false} className="p-5 sm:p-8">
+              <EngineLine>
+                {UNDERSTAND_LOADING}
+                <BlinkCaret />
+              </EngineLine>
+              <p className="mt-4 serif-italic text-[18px] sm:text-[20px] leading-snug text-foreground/75 max-w-[60ch]">
+                &ldquo;{start.example.situation}&rdquo;
+              </p>
+              <div className="mt-6 flex flex-col gap-2.5">
+                <SkeletonLine className="w-2/3" />
+                <SkeletonLine className="w-1/2" />
+              </div>
+            </Card>
+          </Reveal>
+        )}
+
+        {profile && result && (
+          <>
+            <p className="mt-5 text-[13px] leading-relaxed text-muted max-w-[70ch]">
+              {readBackLine(profile, currency)}{" "}
+              <TextLink href="/assess?edit=1" className="text-[13px] whitespace-nowrap">
+                Edit answers
+              </TextLink>
+            </p>
+
+            <WorkLedger
+              funnelKey={session?.loadId ?? 0}
+              className="mt-4"
+              stages={stages}
+              decision={decision}
+              understoodBy={profile.understoodBy}
+              aiGapIds={aiGapIds}
+              pending={!shown}
+              play={animating}
+              hold={decision === null}
+              onHeld={() => setHeldId(session?.loadId ?? 0)}
+              onDone={() => setDoneId(session?.loadId ?? 0)}
+            />
+
+            {!shown && (
+              <PickSkeleton
+                line={
+                  heldId === session?.loadId && result.candidates.length >= 2 && profile.gaps.length > 0
+                    ? `Matching modules in ${result.candidates.length} courses to your ${profile.gaps.length} ${profile.gaps.length === 1 ? "gap" : "gaps"}`
+                    : `Checking ${result.funnel.checked} courses against your answers`
+                }
+              />
+            )}
+
+            {shown && decision && !pickCourse && (
+              <EmptyState
+                profile={profile}
+                adjust={decision.adjust}
+                exclude={decision.exclude}
+                currency={currency}
+                onRelax={onRelax}
+                onCertificateOff={() => onToggle("certificate")}
+                chips={
+                  <AdjustChips
+                    adjust={decision.adjust}
+                    adjustedNote={adjustedNote}
+                    canReset={canReset}
+                    hidden={hidden}
+                    onToggle={onToggle}
+                    onReset={onReset}
+                  />
+                }
+              />
+            )}
+
+            {shown && decision && pickCourse && (
+              <>
+                {decision.honestFit === "weak" && (
+                  <Reveal className="mt-6">
+                    <p className="rounded-2xl border border-border-soft bg-card-alt/60 px-4 sm:px-5 py-3.5 text-[13.5px] leading-relaxed text-foreground/85">
+                      {weakFitNote(decision.gapNote || GAP_NOTE_TEMPLATE)}
+                    </p>
+                  </Reveal>
+                )}
+
+                <div className="mt-6">
+                  <PickCard
+                    course={pickCourse}
+                    candidate={pickCandidate}
+                    profile={profile}
+                    decision={decision}
+                    coverage={coverageFor(pickCourse.id)}
+                    currency={currency}
+                    onBook={onBook}
+                    onCompare={altRows.length > 0 ? () => router.push("/compare") : undefined}
+                  />
+                </div>
+
+                <Reveal delay={0.15}>
+                  <RulesVsAi className="mt-5" decision={decision} rulesTitle={rulesTitle} />
+                </Reveal>
+
+                <Reveal delay={0.25} className="mt-14 sm:mt-16 flex flex-col gap-14 sm:gap-16">
+                  <MentionedCourses profile={profile} decision={decision} currency={currency} />
+
+                  <Alternates
+                    rows={altRows}
+                    gapCount={decision.gaps.length}
+                    pickCoversFirst={Boolean(matchFor(coverageFor(pickCourse.id)?.gaps ?? [], 0))}
+                    hoursPerWeek={profile.hoursPerWeek}
+                    currency={currency}
+                    onSwap={onSwap}
+                  />
+
+                  <AdjustChips
+                    adjust={decision.adjust}
+                    adjustedNote={adjustedNote}
+                    canReset={canReset}
+                    hidden={hidden}
+                    onToggle={onToggle}
+                    onReset={onReset}
+                  >
+                    {showRepick && (
+                      <RepickNote used={repicksUsedNow} max={MAX_REPICKS} status={repick} onSubmit={onRepick} />
+                    )}
+                  </AdjustChips>
+
+                  {leftOut.length > 0 && (
+                    <section id="left-out" aria-label="Left out, and why" className="scroll-mt-6">
+                      <SectionLabel as="h2">Left out, and why</SectionLabel>
+                      <ul className="mt-3 flex flex-col">
+                        {leftOut.map((r) => (
+                          <li
+                            key={r.id}
+                            className="py-3 border-t border-border-soft first:border-t-0 first:pt-1 text-[13.5px] leading-relaxed text-muted"
+                          >
+                            <LeftOutLine id={r.id} text={r.text} />
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  <CheckAnother profile={profile} adjust={decision.adjust} currency={currency} />
+
+                  <DecisionPanel
+                    profile={profile}
+                    decision={decision}
+                    stages={stages}
+                    ruledOut={result.ruledOut}
+                    leftOutShown={leftOut.length}
+                    understanding={understanding}
+                  />
+                </Reveal>
+              </>
+            )}
+          </>
         )}
       </div>
     </main>
   );
 }
 
-// The advisor sometimes answers in markdown, but the panel shows plain text.
-// Drop bold markers (even half-streamed ones), turn list markers into
-// bullets, and remove heading hashes.
-function plainText(s: string): string {
-  return s
-    .replace(/\*\*/g, "")
-    .replace(/^[ \t]*[*-][ \t]+/gm, "• ")
-    .replace(/^#{1,6}[ \t]+/gm, "");
-}
-
-function BlinkCaret() {
+/** "{title}: {why}" with the title set slightly stronger, so the list can be scanned. */
+function LeftOutLine({ id, text }: { id: string; text: string }) {
+  const title = courseById(id)?.title;
+  if (!title || !text.startsWith(`${title}:`)) return <>{text}</>;
   return (
-    <motion.span
-      aria-hidden
-      animate={{ opacity: [1, 0.15, 1] }}
-      transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-      className="inline-block w-[2px] h-[1em] translate-y-[2px] ml-0.5 bg-foreground/70"
-    />
+    <>
+      <span className="text-foreground/85 font-medium">{title}</span>
+      {text.slice(title.length)}
+    </>
   );
 }
 
-function RecCard({
-  rec,
-  streaming,
-}: {
-  rec: Recommendation;
-  streaming: boolean;
-}) {
-  const fit = fitLabel(rec.score);
-  const durationLabel =
-    rec.course.durationHours > 0 ? `${rec.course.durationHours}h` : "Ongoing";
-
+function PickSkeleton({ line }: { line: string }) {
   return (
-    <motion.article
-      layout
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: easeOut }}
-      className="bg-card border border-border rounded-2xl p-5 sm:p-6 hover:border-border-soft transition-colors"
+    <Card padded={false} className="mt-6 p-5 sm:p-8" aria-busy="true">
+      <EngineLine>
+        {line}
+        <BlinkCaret />
+      </EngineLine>
+      <div className="mt-6 flex gap-1.5">
+        <SkeletonLine className="w-16 h-5" />
+        <SkeletonLine className="w-20 h-5" />
+      </div>
+      <SkeletonLine className="mt-5 h-6 w-4/5" />
+      <SkeletonLine className="mt-3 w-1/3" />
+      <div className="mt-6 flex flex-wrap gap-1.5">
+        <SkeletonLine className="w-44 h-6" />
+        <SkeletonLine className="w-24 h-6" />
+        <SkeletonLine className="w-36 h-6" />
+      </div>
+      <div className="mt-8 flex flex-col gap-2.5">
+        <SkeletonLine className="w-full" />
+        <SkeletonLine className="w-11/12" />
+        <SkeletonLine className="w-2/3" />
+      </div>
+      <div className="mt-6 h-32 rounded-xl bg-card-alt/70 animate-pulse" />
+    </Card>
+  );
+}
+
+function RelaxButton({ text, onClick }: { text: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group w-full min-h-12 rounded-xl border border-border bg-card px-4 py-3 text-left text-[14px] text-foreground hover:border-foreground/30 flex items-center justify-between gap-3"
     >
-      <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center bg-card-alt text-foreground text-[11px] font-medium px-2.5 py-1 rounded-full">
-          {rec.category}
-        </span>
-        <span className="text-[11px] uppercase tracking-[0.14em] text-muted">
-          {rec.score > 0 ? fit : ""}
-        </span>
-      </div>
-
-      <div className="mt-3">
-        <h3 className="text-[18px] sm:text-xl leading-snug font-semibold text-foreground">
-          {rec.course.title}
-        </h3>
-        <div className="mt-1.5 text-xs text-muted-2">
-          {rec.course.provider}
-          <span className="mx-1.5 text-border">·</span>
-          {durationLabel}
-          <span className="mx-1.5 text-border">·</span>
-          <span className="capitalize">{rec.course.level}</span>
-        </div>
-      </div>
-
-      {rec.whyThisFitsYou ? (
-        <blockquote className="mt-4 border-l-2 border-foreground/30 pl-3.5 italic text-foreground/85 text-[14px] leading-relaxed">
-          {rec.whyThisFitsYou}
-          {streaming && <BlinkCaret />}
-        </blockquote>
-      ) : (
-        streaming && (
-          <div className="mt-4 flex items-center gap-2 text-xs text-muted-2 pl-3.5">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            writing your fit
-          </div>
-        )
-      )}
-
-      {rec.fitNotes.length > 0 && (
-        <ul
-          className="mt-4 flex flex-wrap gap-1.5"
-          aria-label="What this was scored on"
-        >
-          {rec.fitNotes.map((n) => (
-            <li
-              key={n.label}
-              title={n.text}
-              className="mono-label text-[9px] uppercase tracking-[0.16em] text-muted-2 bg-card-alt rounded-full px-2.5 py-1 cursor-default"
-            >
-              {n.label}
-              <span className="sr-only">: {n.text}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {(rec.careerImpact || rec.prerequisites) && (
-        <dl className="mt-4 flex flex-col gap-2 text-[13px] leading-relaxed">
-          {rec.careerImpact && (
-            <div className="flex gap-2">
-              <dt className="text-muted font-medium min-w-[110px] flex-shrink-0">
-                Career impact:
-              </dt>
-              <dd className="text-foreground/85">{rec.careerImpact}</dd>
-            </div>
-          )}
-          {rec.prerequisites && (
-            <div className="flex gap-2">
-              <dt className="text-muted font-medium min-w-[110px] flex-shrink-0">
-                Prerequisites:
-              </dt>
-              <dd className="text-foreground/85">{rec.prerequisites}</dd>
-            </div>
-          )}
-        </dl>
-      )}
-
-      <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-border-soft">
-        <div className="text-xs text-muted">
-          About {rec.weeksToFinish} {rec.weeksToFinish === 1 ? "week" : "weeks"} at{" "}
-          {rec.weeklyHours} hrs/week
-        </div>
-        <a
-          href={rec.course.url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:gap-1.5 transition-all"
-        >
-          Open course <ExternalLink className="w-3 h-3" />
-        </a>
-      </div>
-    </motion.article>
+      <span>{text}</span>
+      <ArrowRight aria-hidden className="w-4 h-4 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+    </button>
   );
 }
 
-function Advisor({
+function EmptyState({
   profile,
-  recs,
+  adjust,
+  exclude,
+  currency,
+  onRelax,
+  onCertificateOff,
+  chips,
 }: {
-  profile: Profile;
-  recs: Recommendation[];
+  profile: ProfileV2;
+  adjust: Adjust;
+  exclude: string[];
+  currency: "INR" | "USD";
+  onRelax: (r: Relaxation) => void;
+  /** turns "With a certificate" off (a chip change, no network) */
+  onCertificateOff: () => void;
+  chips: React.ReactNode;
 }) {
-  const shortlist = useMemo(
-    () => recs.map((r) => ({ id: r.course.id, title: r.course.title })),
-    [recs],
-  );
-  const { completion, complete, isLoading, input, setInput, error } =
-    useCompletion({
-      api: "/api/advise",
-      streamProtocol: "text",
-    });
-  const [asked, setAsked] = useState<string | null>(null);
-
-  function ask(question: string) {
-    const q = question.trim();
-    if (!q || isLoading) return;
-    setAsked(q);
-    setInput("");
-    complete(q, { body: { profile, shortlist } }).catch(() => {});
-  }
-
-  const suggestions = [
-    "Is this realistic for my schedule?",
-    "Which one should I start first, and why?",
-    "What did you almost recommend but didn't?",
-  ];
-
+  const result = fit(profile, adjust, { currency, exclude });
+  const relax = relaxations(profile, adjust, { currency, exclude });
+  // when the certificate is what rules everything out, offer that change too
+  const withoutCert = adjust.certificate
+    ? fit(profile, { ...adjust, certificate: false }, { currency, exclude }).funnel.finishable
+    : 0;
+  const changes = relax.length + (withoutCert > 0 ? 1 : 0);
+  const closest = closestRuledOut(result);
+  const closestCourse = closest ? courseById(closest.id) : undefined;
+  const adjustedNames = adjustedChipNames(profile, adjust);
+  const adjusted = adjustedNames !== "" || exclude.length > 0;
+  // "With a certificate" they asked for in their own words is part of the answers, not a change
+  const certFromSituation = adjust.certificate && !adjustedNames.includes("With a certificate");
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: easeOut }}
-      className="mb-2 rounded-2xl border border-border bg-card-alt/60 p-5 sm:p-6"
-    >
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-foreground" />
-        <h2 className="text-[15px] font-semibold text-foreground">
-          Push back on these picks
-        </h2>
-      </div>
-      <p className="mt-1 text-[13px] text-muted leading-relaxed">
-        Ask why something is or isn&apos;t here. The advisor answers against your
-        profile and these exact courses.
-      </p>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {suggestions.map((s) => (
-          <button
-            key={s}
-            onClick={() => ask(s)}
-            disabled={isLoading}
-            className="rounded-full border border-border bg-card px-3 py-1.5 text-[12px] text-foreground hover:border-foreground/30 disabled:opacity-50 transition-colors"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          ask(input);
-        }}
-        className="mt-3 flex items-center gap-2"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="e.g. Why not something more advanced?"
-          maxLength={500}
-          className="flex-1 bg-card rounded-xl px-3.5 py-2.5 text-[14px] text-foreground placeholder:text-muted-2 outline-none border border-border focus:border-foreground transition-colors"
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          aria-label="Ask"
-          className="inline-flex items-center justify-center rounded-xl bg-foreground text-accent-fg w-10 h-10 disabled:opacity-30 transition-opacity flex-shrink-0"
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Send className="w-4 h-4" />
-          )}
-        </button>
-      </form>
-
-      <AnimatePresence>
-        {(asked || completion) && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mt-4 rounded-xl bg-card border border-border p-4"
-          >
-            {asked && (
-              <div className="text-[12px] text-muted-2 mb-1.5">
-                You asked: <span className="text-muted">{asked}</span>
-              </div>
+    <Reveal className="mt-6 flex flex-col gap-10">
+      <Card padded={false} className="p-5 sm:p-8">
+        <p className="text-[17px] sm:text-[19px] leading-snug font-medium text-foreground max-w-[46ch]">
+          Nothing in {MOVES[profile.move].label} fits {hoursAWeek(profile.hoursPerWeek)} on{" "}
+          {budgetPhrase(profile.budget, currency)}
+          {certFromSituation ? ", with a certificate" : ""}
+          {adjusted ? " with your changes" : ""}.{changes > 0 ? " Change one answer:" : ""}
+        </p>
+        {changes > 0 && (
+          <div className="mt-5 flex flex-col gap-2">
+            {relax.map((r) => (
+              <RelaxButton key={r.kind} text={r.text} onClick={() => onRelax(r)} />
+            ))}
+            {withoutCert > 0 && (
+              <RelaxButton
+                text={`Without a certificate, ${withoutCert} ${withoutCert === 1 ? "course fits" : "courses fit"}.`}
+                onClick={onCertificateOff}
+              />
             )}
-            <p className="text-[14px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
-              {plainText(completion)}
-              {isLoading && !completion && (
-                <span className="inline-flex items-center gap-2 text-muted">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking
-                </span>
-              )}
-              {isLoading && completion && <BlinkCaret />}
-              {!isLoading && asked && !completion && (
-                <span className="text-muted">
-                  {error
-                    ? "Couldn't answer that just now. Try again."
-                    : "No answer came back. Try rephrasing it."}
-                </span>
-              )}
-            </p>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-    </motion.section>
+        {closest && (
+          <div className="mt-6 pt-5 border-t border-border-soft text-[13.5px] leading-relaxed text-muted">
+            <p>Closest: {closest.text}</p>
+            {closestCourse?.freeStart && (
+              <p className="mt-1.5">
+                You can still try its free start:{" "}
+                <a
+                  href={closestCourse.freeStart.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground/40"
+                >
+                  {closestCourse.freeStart.label}
+                </a>
+                .
+              </p>
+            )}
+          </div>
+        )}
+        <div className="mt-6">
+          <TextLink href="/assess?edit=1">Edit answers</TextLink>
+        </div>
+      </Card>
+      {chips}
+    </Reveal>
   );
 }

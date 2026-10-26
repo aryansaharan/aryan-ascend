@@ -31,11 +31,21 @@ body {
   overflow-x: clip;
 }
 
-/* Refined focus ring for keyboard users: visible but not aggressive */
-*:focus-visible {
-  outline: 2px solid #0A0A0A;
-  outline-offset: 2px;
-  border-radius: 2px;
+/* Keyboard focus and in-page jumps stop clear of the sticky button bar on
+ * /assess, so a focused control is never hidden behind it. */
+html {
+  scroll-padding-bottom: 6.5rem;
+}
+
+/* Refined focus ring for keyboard users: visible but not aggressive.
+ * In the base layer so a component's own focus style (focus-visible:*
+ * utilities) can replace it instead of doubling up. */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid #0A0A0A;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 }
 
 /* Smoother button + link transitions globally */

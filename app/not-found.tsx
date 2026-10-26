@@ -46,8 +46,8 @@ export default function NotFound() {
             transition={{ duration: 0.6, delay: 0.15, ease: easeOut }}
             className="mt-6 text-[15px] sm:text-base text-muted max-w-[42ch]"
           >
-            This page doesn&apos;t exist in your guided session. The shortlist
-            lives elsewhere.
+            Nothing lives at this address. If you followed a plan link, check
+            that the whole link was copied.
           </motion.p>
 
           <motion.div
@@ -60,7 +60,7 @@ export default function NotFound() {
               href="/"
               className="inline-flex items-center gap-2 bg-foreground text-accent-fg rounded-2xl px-6 py-3.5 font-medium text-[15px] hover:gap-3 transition-all"
             >
-              Back to landing
+              Back to the start
               <ArrowRight className="w-4 h-4" />
             </Link>
           </motion.div>

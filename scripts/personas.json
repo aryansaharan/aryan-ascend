@@ -1,0 +1,338 @@
+[
+  {
+    "id": "hr-generalist",
+    "label": "HR generalist",
+    "expectedMove": "data",
+    "profile": {
+      "v": 2,
+      "currentRole": "HR generalist, 4 years, lives in Excel and our HRIS",
+      "move": "data",
+      "baseline": 0,
+      "hoursPerWeek": 1,
+      "budget": "free",
+      "situation": "HR generalist, 4 years. I live in Excel and our HRIS and I want to answer attrition questions properly instead of guessing. Never written SQL. Someone suggested the Google Data Analytics certificate.",
+      "gaps": [
+        "sql",
+        "dashboards",
+        "storytelling"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "new-grad",
+    "label": "New grad",
+    "expectedMove": "data",
+    "profile": {
+      "v": 2,
+      "currentRole": "Commerce graduate looking for a first data analyst job",
+      "move": "data",
+      "baseline": 0,
+      "hoursPerWeek": 12,
+      "budget": "low",
+      "situation": "Commerce graduate, finished college last year and looking for my first data analyst job. I got good with Excel during my internship but have never used SQL or Python. I can put in serious time every week.",
+      "gaps": [
+        "sql",
+        "python-data",
+        "dashboards"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "frontend-engineer",
+    "label": "Frontend engineer",
+    "expectedMove": "ai-build",
+    "profile": {
+      "v": 2,
+      "currentRole": "Frontend engineer at a fintech, 2 years in React",
+      "move": "ai-build",
+      "baseline": 0,
+      "hoursPerWeek": 3,
+      "budget": "low",
+      "situation": "Frontend engineer at a fintech startup, 2 years in React and TypeScript. I want to build AI features, not just call them from the UI. I've played with the OpenAI playground but never shipped anything. I have Andrew Ng's Machine Learning Specialization open in a tab.",
+      "gaps": [
+        "llm-apis",
+        "prompting",
+        "evals"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "performance-marketer",
+    "label": "Performance marketer",
+    "expectedMove": "lead",
+    "profile": {
+      "v": 2,
+      "currentRole": "Performance marketer running Meta and Google ads, 4 years",
+      "move": "lead",
+      "baseline": 1,
+      "hoursPerWeek": 5,
+      "budget": "any",
+      "situation": "Performance marketer running Meta and Google ads, 4 years. From next month I lead two juniors and I've never managed anyone formally, though I mentor our interns. I want to get one-to-ones and feedback right.",
+      "gaps": [
+        "one-on-ones",
+        "feedback",
+        "delegation"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "teacher",
+    "label": "Teacher",
+    "expectedMove": "ux",
+    "profile": {
+      "v": 2,
+      "currentRole": "School English teacher, 6 years",
+      "move": "ux",
+      "baseline": 0,
+      "hoursPerWeek": 5,
+      "budget": "low",
+      "situation": "School English teacher, 6 years. I want to move into UX design. I redesigned our school's parent forms on my own and people said they were easier to fill in. I've never used Figma.",
+      "gaps": [
+        "ux-process",
+        "ux-research",
+        "wireframing"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "csm",
+    "label": "Customer success manager",
+    "expectedMove": "product",
+    "profile": {
+      "v": 2,
+      "currentRole": "Customer success manager at a B2B SaaS company, 3 years",
+      "move": "product",
+      "baseline": 0,
+      "hoursPerWeek": 3,
+      "budget": "free",
+      "situation": "Customer success manager at a B2B SaaS company, 3 years. I log feature requests that mostly get ignored, and I want to move into product. I know basic SQL. I started the Google Project Management certificate and dropped it after a month.",
+      "gaps": [
+        "discovery",
+        "user-research",
+        "prioritization"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "analyst-deeper",
+    "label": "Analyst going deeper",
+    "expectedMove": "data",
+    "profile": {
+      "v": 2,
+      "currentRole": "Business analyst who writes SQL daily, 3 years",
+      "move": "data",
+      "baseline": 2,
+      "hoursPerWeek": 3,
+      "budget": "low",
+      "situation": "Business analyst who writes SQL daily, 3 years. I build the weekly dashboards our sales leads rely on. I want to go deeper into data modeling and better SQL so my reports stop breaking.",
+      "gaps": [
+        "data-modeling",
+        "sql-advanced",
+        "bi-tools"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "pm-adding-ai",
+    "label": "PM adding AI",
+    "expectedMove": "ai-pm",
+    "profile": {
+      "v": 2,
+      "currentRole": "Product manager at a logistics startup, 3 years",
+      "move": "ai-pm",
+      "baseline": 1,
+      "hoursPerWeek": 3,
+      "budget": "mid",
+      "situation": "Product manager at a logistics startup, 3 years. Leadership wants AI features on the roadmap and I've written one spec for a chatbot pilot. I don't know how to judge whether the AI is good enough to ship.",
+      "gaps": [
+        "ai-evals",
+        "ai-specs",
+        "ai-metrics"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "engineer-new-to-ai",
+    "label": "Engineer new to AI",
+    "expectedMove": "ai-build",
+    "profile": {
+      "v": 2,
+      "currentRole": "Backend engineer, Java and Spring, 2 years",
+      "move": "ai-build",
+      "baseline": 0,
+      "hoursPerWeek": 1,
+      "budget": "free",
+      "situation": "Backend engineer, Java and Spring, 2 years. I want to start building with LLMs but I only have about an hour a week and no budget. I've used ChatGPT but never the API.",
+      "gaps": [
+        "llm-apis",
+        "prompting",
+        "rag"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "apm",
+    "label": "APM",
+    "expectedMove": "product",
+    "profile": {
+      "v": 2,
+      "currentRole": "Associate product manager at a consumer app, 1 year",
+      "move": "product",
+      "baseline": 1,
+      "hoursPerWeek": 5,
+      "budget": "any",
+      "situation": "Associate product manager at a consumer app, 1 year. I own a small backlog but engineers push back on my specs and I struggle to prioritise. I want to get better at product, not switch.",
+      "gaps": [
+        "specs",
+        "prioritization",
+        "with-engineers"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "designer",
+    "label": "Designer",
+    "expectedMove": "ux",
+    "profile": {
+      "v": 2,
+      "currentRole": "Visual designer at an agency, 2 years",
+      "move": "ux",
+      "baseline": 1,
+      "hoursPerWeek": 2,
+      "budget": "free",
+      "situation": "Visual designer at an agency, 2 years, mostly brand work and social posts. I want to move into UX design. I've done a little user research on a side project.",
+      "gaps": [
+        "ux-research",
+        "prototyping",
+        "usability-testing"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "new-manager",
+    "label": "New manager",
+    "expectedMove": "lead",
+    "profile": {
+      "v": 2,
+      "currentRole": "Engineering lead who just got two direct reports",
+      "move": "lead",
+      "baseline": 2,
+      "hoursPerWeek": 2,
+      "budget": "low",
+      "situation": "Engineering lead who just got two direct reports. I manage people now but I've never written a performance review and my one-to-ones feel like status updates.",
+      "gaps": [
+        "performance",
+        "one-on-ones",
+        "feedback"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "growth-marketer",
+    "label": "Growth marketer",
+    "expectedMove": "growth",
+    "profile": {
+      "v": 2,
+      "currentRole": "Growth marketer at a D2C brand, 2 years",
+      "move": "growth",
+      "baseline": 1,
+      "hoursPerWeek": 3,
+      "budget": "low",
+      "situation": "Growth marketer at a D2C brand, 2 years. I run our Meta campaigns and email flows, but I want to own a growth number and run proper experiments instead of guessing.",
+      "gaps": [
+        "growth-experiments",
+        "funnels",
+        "retention"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  },
+  {
+    "id": "cloud-engineer",
+    "label": "Engineer moving into cloud",
+    "expectedMove": "cloud",
+    "profile": {
+      "v": 2,
+      "currentRole": "Full stack developer who has never deployed alone, 1 year",
+      "move": "cloud",
+      "baseline": 0,
+      "hoursPerWeek": 5,
+      "budget": "free",
+      "situation": "Full stack developer, 1 year. I build features but have never deployed anything alone; someone else handles our servers. I want to learn Docker and CI/CD so I can ship my own side projects.",
+      "gaps": [
+        "containers",
+        "ci-cd",
+        "cloud-basics"
+      ],
+      "strengths": [],
+      "mentioned": [],
+      "wantsCertificate": false,
+      "prefersFormat": "any",
+      "understoodBy": "user"
+    }
+  }
+]

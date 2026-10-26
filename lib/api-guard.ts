@@ -3,8 +3,10 @@ import type { z } from "zod";
 // Server-only gate for the AI routes. Runs before any model call, in order:
 //   1. 403 unless the request comes from this site's own pages
 //   2. 413 if the body is larger than MAX_BODY_BYTES
-//   3. 429 if this IP has used up its allowance for the route
-//   4. 400 unless the body is JSON that matches the route's schema
+//   3. 400 unless the body is JSON that matches the route's schema
+//   4. 429 if this IP has used up its allowance for the route: the route
+//      calls spend() once it knows the answer isn't already in the server's
+//      cache, so an answer that costs no model call never uses up the limit
 //
 // The origin check stops other websites from using the API through a
 // visitor's browser. It does not stop scripts, which can fake any header;
@@ -37,8 +39,18 @@ function clientIp(request: Request): string {
   return forwarded || "unknown";
 }
 
+/**
+ * Local development only: ASCEND_DEV_NO_RATE_LIMIT=1 (in .env.development.local)
+ * skips the per-IP limit so building and screenshotting pages against the
+ * dev mock doesn't run into 429s. Never applies when NODE_ENV is production.
+ */
+function rateLimitOff(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.ASCEND_DEV_NO_RATE_LIMIT === "1";
+}
+
 /** Returns 0 if allowed, otherwise the seconds until the next request is. */
 function retryAfterSeconds(key: string, now: number): number {
+  if (rateLimitOff()) return 0;
   const recent = (hits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
   if (recent.length >= RATE_LIMIT) {
     hits.set(key, recent);
@@ -73,11 +85,24 @@ async function readCapped(request: Request): Promise<string | null> {
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
+export type Guarded<T> =
+  | {
+      ok: true;
+      body: T;
+      /**
+       * Charges this request to the IP's allowance for the route: null when
+       * allowed, otherwise the 429 response to return. Call it on every path
+       * except an answer served from the server's cache.
+       */
+      spend: () => Response | null;
+    }
+  | { ok: false; response: Response };
+
 export async function guardRequest<T>(
   request: Request,
   route: string,
   schema: z.ZodType<T>,
-): Promise<{ ok: true; body: T } | { ok: false; response: Response }> {
+): Promise<Guarded<T>> {
   if (!isSameSite(request)) {
     return { ok: false, response: json(403, "Forbidden") };
   }
@@ -87,15 +112,16 @@ export async function guardRequest<T>(
     return { ok: false, response: json(413, "Request too large") };
   }
 
-  const wait = retryAfterSeconds(`${route}:${clientIp(request)}`, Date.now());
-  if (wait > 0) {
-    return {
-      ok: false,
-      response: json(429, "Too many requests. Try again in a few minutes.", {
-        "retry-after": String(wait),
-      }),
-    };
-  }
+  const key = `${route}:${clientIp(request)}`;
+  let spent = false;
+  const spend = (): Response | null => {
+    if (spent) return null;
+    spent = true;
+    const wait = retryAfterSeconds(key, Date.now());
+    return wait > 0
+      ? json(429, "Too many requests. Try again in a few minutes.", { "retry-after": String(wait) })
+      : null;
+  };
 
   const text = await readCapped(request);
   if (text === null) {
@@ -113,5 +139,5 @@ export async function guardRequest<T>(
   if (!parsed.success) {
     return { ok: false, response: json(400, "Invalid request body") };
   }
-  return { ok: true, body: parsed.data };
+  return { ok: true, body: parsed.data, spend };
 }

@@ -1,0 +1,399 @@
+{
+  "ranAt": "2026-10-26T07:11:38.963Z",
+  "catalogVersion": "2026-10-20",
+  "catalogEntries": 69,
+  "shippedMoves": [
+    "ai-build",
+    "ai-pm",
+    "product",
+    "data",
+    "ux",
+    "lead",
+    "growth",
+    "cloud"
+  ],
+  "total": 2875,
+  "failed": 0,
+  "passRate": 1,
+  "sections": {
+    "rules": {
+      "pass": 2434,
+      "fail": 0
+    },
+    "catalog": {
+      "pass": 18,
+      "fail": 0
+    },
+    "unit": {
+      "pass": 423,
+      "fail": 0
+    }
+  },
+  "failures": [],
+  "ai": "skipped (AI_API_KEY not set)",
+  "personas": [
+    {
+      "id": "hr-generalist",
+      "move": "data",
+      "shipped": true,
+      "keywordMoveGuess": "data",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 8,
+        "withinBudget": 5,
+        "finishable": 5
+      },
+      "pick": "kaggle-intro-to-sql",
+      "alternates": [
+        {
+          "id": "kaggle-advanced-sql",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        },
+        {
+          "id": "microsoft-learn-power-bi-pl-300",
+          "insteadIf": "Pick this instead if you want a win in 2 weeks."
+        }
+      ],
+      "gapsCovered": 1,
+      "reason": null
+    },
+    {
+      "id": "new-grad",
+      "move": "data",
+      "shipped": true,
+      "keywordMoveGuess": "data",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 8,
+        "withinBudget": 7,
+        "finishable": 7
+      },
+      "pick": "kaggle-intro-to-sql",
+      "alternates": [
+        {
+          "id": "kaggle-advanced-sql",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        },
+        {
+          "id": "storytelling-with-data",
+          "insteadIf": "Pick this instead if you'd rather read than watch."
+        }
+      ],
+      "gapsCovered": 1,
+      "reason": null
+    },
+    {
+      "id": "frontend-engineer",
+      "move": "ai-build",
+      "shipped": true,
+      "keywordMoveGuess": "ai-build",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 7,
+        "current": 5,
+        "withinBudget": 4,
+        "finishable": 4
+      },
+      "pick": "anthropic-claude-platform-101",
+      "alternates": [
+        {
+          "id": "chip-huyen-ai-engineering",
+          "insteadIf": "Pick this instead if you'd rather read than watch."
+        },
+        {
+          "id": "hugging-face-agents-course",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "performance-marketer",
+      "move": "lead",
+      "shipped": true,
+      "keywordMoveGuess": "lead",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 9,
+        "withinBudget": 9,
+        "finishable": 9
+      },
+      "pick": "making-of-a-manager",
+      "alternates": [
+        {
+          "id": "managers-path",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        },
+        {
+          "id": "resilient-management",
+          "insteadIf": "Pick this instead if you want a win in 2 weeks."
+        }
+      ],
+      "gapsCovered": 3,
+      "reason": null
+    },
+    {
+      "id": "teacher",
+      "move": "ux",
+      "shipped": true,
+      "keywordMoveGuess": "ux",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 7,
+        "withinBudget": 5,
+        "finishable": 5
+      },
+      "pick": "openlearn-introduction-interaction-design",
+      "alternates": [
+        {
+          "id": "content-design-book-winters-edwards",
+          "insteadIf": "Pick this instead if you'd rather read than watch."
+        },
+        {
+          "id": "dont-make-me-think-revisited",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "csm",
+      "move": "product",
+      "shipped": true,
+      "keywordMoveGuess": "product",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 7,
+        "withinBudget": 2,
+        "finishable": 2
+      },
+      "pick": "pendo-product-judgment",
+      "alternates": [
+        {
+          "id": "basecamp-shape-up",
+          "insteadIf": "Pick this instead if you'd rather read than watch."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "analyst-deeper",
+      "move": "data",
+      "shipped": true,
+      "keywordMoveGuess": "data",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 6,
+        "withinBudget": 5,
+        "finishable": 5
+      },
+      "pick": "dbt-fundamentals",
+      "alternates": [
+        {
+          "id": "storytelling-with-data",
+          "insteadIf": "Pick this instead if you'd rather read than watch."
+        },
+        {
+          "id": "trailhead-tableau-public-storytelling",
+          "insteadIf": "Also fits your hours and budget."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "pm-adding-ai",
+      "move": "ai-pm",
+      "shipped": true,
+      "keywordMoveGuess": "ai-pm",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 9,
+        "current": 9,
+        "withinBudget": 7,
+        "finishable": 7
+      },
+      "pick": "nika-building-ai-powered-products",
+      "alternates": [
+        {
+          "id": "google-managing-ml-projects",
+          "insteadIf": "Pick this instead if you want to spend nothing."
+        },
+        {
+          "id": "google-ml-problem-framing",
+          "insteadIf": "Pick this instead if you want a win in 1 week."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "engineer-new-to-ai",
+      "move": "ai-build",
+      "shipped": true,
+      "keywordMoveGuess": "ai-build",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 7,
+        "current": 5,
+        "withinBudget": 3,
+        "finishable": 3
+      },
+      "pick": "anthropic-claude-platform-101",
+      "alternates": [
+        {
+          "id": "hugging-face-agents-course",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        },
+        {
+          "id": "google-ml-crash-course",
+          "insteadIf": "Also fits your hours and budget."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "apm",
+      "move": "product",
+      "shipped": true,
+      "keywordMoveGuess": "product",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 9,
+        "withinBudget": 9,
+        "finishable": 9
+      },
+      "pick": "basecamp-shape-up",
+      "alternates": [
+        {
+          "id": "reforge-mastering-product-management",
+          "insteadIf": "Pick this instead if you want exercises, not just reading."
+        },
+        {
+          "id": "pendo-product-judgment",
+          "insteadIf": "Pick this instead if you need a certificate for applications."
+        }
+      ],
+      "gapsCovered": 3,
+      "reason": null
+    },
+    {
+      "id": "designer",
+      "move": "ux",
+      "shipped": true,
+      "keywordMoveGuess": "ux",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 9,
+        "withinBudget": 3,
+        "finishable": 3
+      },
+      "pick": "openlearn-introduction-interaction-design",
+      "alternates": [
+        {
+          "id": "figma-design-for-beginners",
+          "insteadIf": "Pick this instead if you want a win in 2 weeks."
+        },
+        {
+          "id": "figma-introduction-to-design-systems",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    },
+    {
+      "id": "new-manager",
+      "move": "lead",
+      "shipped": true,
+      "keywordMoveGuess": "lead",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 6,
+        "withinBudget": 5,
+        "finishable": 5
+      },
+      "pick": "openlearn-managing-and-managing-people",
+      "alternates": [
+        {
+          "id": "resilient-management",
+          "insteadIf": "Pick this instead if you want a win in 3 weeks."
+        },
+        {
+          "id": "managers-path",
+          "insteadIf": "Pick this instead if you'd rather read than watch."
+        }
+      ],
+      "gapsCovered": 1,
+      "reason": null
+    },
+    {
+      "id": "growth-marketer",
+      "move": "growth",
+      "shipped": true,
+      "keywordMoveGuess": "growth",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 9,
+        "withinBudget": 6,
+        "finishable": 6
+      },
+      "pick": "book-hacking-growth",
+      "alternates": [
+        {
+          "id": "book-trustworthy-online-controlled-experiments",
+          "insteadIf": "Pick this instead if you want more depth and can stretch."
+        },
+        {
+          "id": "udacity-ab-testing",
+          "insteadIf": "Pick this instead if you want to spend nothing."
+        }
+      ],
+      "gapsCovered": 3,
+      "reason": null
+    },
+    {
+      "id": "cloud-engineer",
+      "move": "cloud",
+      "shipped": true,
+      "keywordMoveGuess": "cloud",
+      "funnel": {
+        "checked": 69,
+        "inMove": 9,
+        "atLevel": 7,
+        "withinBudget": 5,
+        "finishable": 5
+      },
+      "pick": "lf-introduction-to-kubernetes-lfs158",
+      "alternates": [
+        {
+          "id": "docker-build-and-share-an-app",
+          "insteadIf": "Pick this instead if you want a win in 1 week."
+        },
+        {
+          "id": "ms-learn-github-actions-part-1",
+          "insteadIf": "Also fits your hours and budget."
+        }
+      ],
+      "gapsCovered": 2,
+      "reason": null
+    }
+  ]
+}
