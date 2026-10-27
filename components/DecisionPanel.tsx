@@ -279,7 +279,7 @@ export function DecisionPanel({
                 {input.candidates.length} courses that passed the rules, with the module names in scope; your{" "}
                 {input.gaps.length} {input.gaps.length === 1 ? "gap" : "gaps"}
                 {input.mentioned.length ? `; ${input.mentioned.length} ${input.mentioned.length === 1 ? "course" : "courses"} you mentioned` : ""}
-                . No hours or prices.
+                . No hours or prices from code; your own words go as you wrote them.
               </>
             ) : (
               <>
@@ -329,8 +329,9 @@ export function DecisionPanel({
         {/* 04 Tailor */}
         <Job index="04" title="Tailor" by="When you book">
           <Row label="When">
-            Runs once when you make your plan. Each week gets one task for your job, built from that week&apos;s modules
-            and checked by code. Opening the plan later makes no AI call.
+            Runs once per course when you open the booking step, and the answer is saved on this device. Each week gets
+            one task for your job, built from that week&apos;s modules and checked by code. Opening the plan later makes
+            no AI call.
           </Row>
         </Job>
       </div>

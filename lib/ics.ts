@@ -82,8 +82,9 @@ function eventLines(e: IcsEvent, stamp: string, sequence: number): string[] {
 
 /**
  * The calendar file: first session (s, 25 min), backup (k, 25 min) and the
- * day-14 check (s + 14 days, 10 min). Each description holds the first step
- * and the plan link.
+ * day-14 check (s + 14 days, 10 min), each with a 10-minute alert. The first
+ * session and the backup carry the first step and the plan link; the two-week
+ * check carries the plan link, since by then the first step is done.
  */
 export function buildIcs(args: {
   plan: PlanPayloadV2;

@@ -156,6 +156,18 @@ export function totalModulesMapped(coverage: readonly CandidateCoverage[]): numb
   return coverage.reduce((sum, c) => sum + modulesMapped(c.gaps), 0);
 }
 
+/**
+ * The receipt's course and module counts after a chip or swap: only courses
+ * the AI (or the dev mock) mapped itself, so a course keywords matched for the
+ * first time is never counted as the AI's work. Keyword-only coverage (the
+ * rules path) is counted as it is.
+ */
+function receiptCounts(coverage: readonly CandidateCoverage[]): { courses: number; modulesMapped: number } {
+  const own = coverage.filter((c) => c.source !== "keywords");
+  const counted = own.length > 0 ? own : coverage;
+  return { courses: counted.length, modulesMapped: totalModulesMapped(counted) };
+}
+
 /** The receipt counts for a response with nothing removed (rules path, mock base). */
 export function baseReceipt(profile: FitProfile, coverage: readonly CandidateCoverage[]): Receipt {
   return {
@@ -358,7 +370,7 @@ export function adjustPick(
         vsRules: rulesPickId === prev.rulesPickId && rulesPickId !== pick.id ? prev.vsRules : "",
         // skim notes past a shorter scope would name modules they won't take
         skim: (prev.skim ?? []).filter((x) => x.module < pick.moduleCount),
-        receipt: { ...prev.receipt, courses: coverage.length, modulesMapped: totalModulesMapped(coverage) },
+        receipt: { ...prev.receipt, ...receiptCounts(coverage) },
       },
       origin: prev.origin,
       result,
@@ -372,7 +384,7 @@ export function adjustPick(
       ...rules,
       coverage,
       mentionedVerdicts: [],
-      receipt: { ...rules.receipt, courses: coverage.length, modulesMapped: totalModulesMapped(coverage) },
+      receipt: { ...rules.receipt, ...receiptCounts(coverage) },
     },
     origin: "adjusted",
     result,

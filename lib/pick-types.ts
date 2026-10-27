@@ -118,7 +118,8 @@ export type AiInput = {
     role: string;
     situation: string;
     direction: string;
-    startingPoint: string;
+    /** the preset level they confirmed (lib/moves anchors), not their words */
+    startingLevel: string;
     budget: string;
   };
   gaps: { i: number; id: string; label: string }[];

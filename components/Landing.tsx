@@ -51,8 +51,10 @@ export type LandingProps = {
   /** AI_JOBS from lib/templates */
   aiJobs: { title: string; body: string }[];
   aiJobsFootnote: string;
-  /** "Claude Opus 5.5" */
+  /** the model the server calls, "Claude Opus 5.5" */
   modelName: string;
+  /** the model of the recorded run below (lib/landing-run JOB_RUN.model) */
+  runModelName: string;
 };
 
 type JobExample = {
@@ -130,6 +132,7 @@ export default function Landing({
   aiJobs,
   aiJobsFootnote,
   modelName,
+  runModelName,
 }: LandingProps) {
   const reduced = useReducedMotion();
   const hasPlan = useHasSavedPlan();
@@ -422,8 +425,10 @@ export default function Landing({
           <p className="mt-4 text-[14px] sm:text-[15px] leading-relaxed text-muted max-w-[60ch]">
             Four jobs, each one visible on your screen and checked by code.
             Below, what each job returned for one example person, a customer
-            success manager moving into product, in a real {modelName} run on{" "}
-            {JOB_RUN.date}. Run the example to see a live answer.
+            success manager moving into product, in a real {runModelName} run
+            on {JOB_RUN.date}. Run the example to see live answers, which can
+            differ a little from this run. The weekly tasks appear once you
+            book a first session.
           </p>
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {aiJobs.map((job, i) => (
@@ -458,7 +463,7 @@ export default function Landing({
         </section>
 
         {/* Where it helps: the directions that pass MIN_ENTRIES */}
-        <section className="mt-20 sm:mt-28">
+        <section className="mt-20 sm:mt-28 mb-12">
           <SectionEyebrow index="04">Where it helps</SectionEyebrow>
           <motion.ul
             initial="hidden"
@@ -490,27 +495,6 @@ export default function Landing({
               Tell Aryan which one.
             </a>
           </p>
-        </section>
-
-        {/* Testimonials: verbatim, about v0.1 */}
-        <section className="mt-20 sm:mt-28 mb-12">
-          <SectionEyebrow index="05" aside="Feedback on v0.1">
-            What early users said
-          </SectionEyebrow>
-          <div className="mt-7 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            <TestimonialCard
-              quote="Helped me cut my reading list from 30 tabs to 3 courses I actually finished."
-              author="Vipul Goel"
-              role="Pronto"
-              delay={0}
-            />
-            <TestimonialCard
-              quote="Confirmed the one growth course I'd been circling for months. Started it the next morning."
-              author="Akshit Panwar"
-              role="Pronto"
-              delay={0.1}
-            />
-          </div>
         </section>
 
         {/* Footer */}
@@ -748,44 +732,6 @@ function Stat({
         <p className="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-border-soft text-[12.5px] sm:text-[13px] leading-relaxed text-foreground/80">
           {decision}
         </p>
-      </div>
-    </motion.div>
-  );
-}
-
-function TestimonialCard({
-  quote,
-  author,
-  role,
-  delay,
-}: {
-  quote: string;
-  author: string;
-  role: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.4 }}
-      transition={{ duration: 0.5, delay, ease: easeOut }}
-      whileHover={{ y: -2 }}
-      className="bg-card border border-border-soft rounded-2xl p-6 sm:p-7 card-elev card-elev-hover"
-    >
-      <p className="serif-italic text-[17px] sm:text-[18px] leading-relaxed text-foreground/85">
-        &ldquo;{quote}&rdquo;
-      </p>
-      <div className="mt-5 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-card-alt border border-border-soft flex items-center justify-center text-[13px] font-semibold text-foreground">
-          {author[0]}
-        </div>
-        <div>
-          <div className="text-[13.5px] font-medium text-foreground leading-tight">
-            {author}
-          </div>
-          <div className="text-xs text-muted leading-tight mt-0.5">{role}</div>
-        </div>
       </div>
     </motion.div>
   );

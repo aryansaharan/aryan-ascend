@@ -5,7 +5,7 @@ import { GapMark } from "@/components/PickCard";
 import { Card, SecondaryButton, SectionLabel, easeOut } from "@/components/ui";
 import type { Course } from "@/lib/course-types";
 import type { Candidate } from "@/lib/fit";
-import { costLine, paceLine, type DisplayCurrency } from "@/lib/format";
+import { checkedLabel, costLine, paceLine, type DisplayCurrency } from "@/lib/format";
 import type { Alternate, CandidateCoverage } from "@/lib/pick-types";
 import { matchFor } from "@/lib/skills";
 import { coverageCountLine } from "@/lib/templates";
@@ -62,6 +62,7 @@ export function Alternates({
                   <p className="mt-1.5 text-[12.5px] text-muted leading-relaxed">
                     {r.candidate ? `${paceLine(r.candidate.weeks, hoursPerWeek)} · ` : ""}
                     {costLine(r.course, r.candidate?.costAtPace, currency)}
+                    {` · ${checkedLabel(r.course)}`}
                   </p>
                   {gapCount > 0 && r.coverage && (
                     <div className="mt-2.5 flex items-center gap-2">

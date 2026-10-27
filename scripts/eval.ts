@@ -6,7 +6,7 @@
 // pace, plan links (compressed and not), the .ics file, the three verifiers
 // (understand, pick, tailor), the rules reading of a situation, the dev-only
 // mock, and every AI fallback (simulated with ASCEND_TEST_AI, no key needed).
-// Course ids are never hardcoded: the catalog can be swapped. If AI_API_KEY is
+// Course ids are never hardcoded: the catalog can be swapped. If ANTHROPIC_API_KEY is
 // set, every persona also goes through the real model (understand, pick,
 // tailor), 6 seconds apart. Writes scripts/eval-results.json and prints the
 // pass rate.
@@ -82,6 +82,7 @@ import {
   coveredCount,
   keywordCoverage,
   modulesMapped,
+  skillLabel,
   skillsFor,
   type SkillId,
 } from "../lib/skills";
@@ -94,6 +95,7 @@ import {
   firstStep,
   MOVE_PHRASES,
   planOpener,
+  readBackLine,
   receiptLines,
   roleNoun,
   rulesAloneLine,
@@ -116,7 +118,7 @@ import {
   understandOutputSchema,
   understandSituation,
 } from "../lib/understand-ai";
-import { NUMBER_UNIT_RE, cleanProse, hasHype, verify } from "../lib/verify";
+import { NUMBER_UNIT_RE, cleanProse, cutToCap, hasHype, sentences, verify } from "../lib/verify";
 import { verifyTailoring } from "../lib/verify-tailor";
 import { verifyUnderstanding } from "../lib/verify-understand";
 import { guardRequest } from "../lib/api-guard";
@@ -681,6 +683,16 @@ async function planLinkChecks(): Promise<void> {
   eq(s, "reschedule counts", moved.rb, 1);
   check(s, "payload validation rejects a 171-character task", toPlanPayload({ ...tailoredPlan, tw: ["x".repeat(171)] }) === null);
   check(s, "payload accepts the mock engine", toPlanPayload({ ...tailoredPlan, e: "mock", te: "mock" }) !== null);
+  {
+    // a link that says the dev mock answered shows templates in production
+    const env = process.env as Record<string, string | undefined>;
+    const was = env.NODE_ENV;
+    env.NODE_ENV = "production";
+    const prodMock = toPlanPayload({ ...tailoredPlan, e: "mock", te: "mock", w: "Mock line." });
+    env.NODE_ENV = was;
+    check(s, "in production a mock link shows no mock text or label", prodMock !== null && prodMock.e === "rules" && prodMock.te === "rules" && !prodMock.tw && !prodMock.ta && !prodMock.w, JSON.stringify(prodMock));
+  }
+  check(s, "a link names only a Claude model", !toPlanPayload({ ...tailoredPlan, te: "ai", tm: "gpt-5" })?.tm);
   check(s, "payload rejects a far-future session date", toPlanPayload({ ...tailoredPlan, s: "+275760-09-10T00:00:00.000Z" }) === null);
   check(s, "payload rejects a date that isn't toISOString output", toPlanPayload({ ...tailoredPlan, t: "Tue, 21 Oct 2026 15:00:00 GMT" }) === null);
   check(s, "payload rejects a restart outside 2020 to 2100", toPlanPayload({ ...tailoredPlan, rs: { w: 2, d: "9999-01-05" } }) === null);
@@ -753,13 +765,18 @@ section("unit:swap", () => {
   check(s, "receipt line counts words, gaps, modules and courses", lines.length === 2 && lines[0].includes(`${d.receipt.words} words`) && lines[0].includes(`across ${d.receipt.courses} courses`), lines[0]);
   check(s, "rules receipt doesn't repeat the engine line", !/AI (unavailable|isn't set up)/.test(receiptLines({ ...d, origin: "pick" })[0]) && receiptLines({ ...d, origin: "pick" })[0].includes("by keywords"), receiptLines({ ...d, origin: "pick" })[0]);
   const withGaps = { ...d, engine: "ai" as const, origin: "pick" as const, receipt: { ...d.receipt, gaps: 2 } };
-  check(s, "receipt credits the AI only for gaps it named", receiptLines({ ...withGaps, gaps: ["a", "b"] }, "ai", ["a"])[0].includes("found 1 gap · you changed them to 2") && receiptLines({ ...withGaps, gaps: ["a"] }, "ai", ["a", "b"])[0].includes("· found 2 gaps ·") && receiptLines(withGaps, "ai", null)[0].includes("worked from your 2 gaps"));
+  check(s, "receipt credits the AI only for gaps it named", receiptLines({ ...withGaps, gaps: ["a", "b"] }, "ai", ["a"])[0].includes("found 1 gap · you changed them to 2") && receiptLines(withGaps, "ai", null)[0].includes("worked from your 2 gaps"));
+  const removedOne = { ...withGaps, gaps: ["a"], receipt: { ...withGaps.receipt, gaps: 1 } };
+  check(s, "receipt says so when a gap was removed on Check", receiptLines(removedOne, "ai", ["a", "b"])[0].includes("found 2 gaps · you changed them to 1"), receiptLines(removedOne, "ai", ["a", "b"])[0]);
+  check(s, "receipt says so when gaps were reordered on Check", receiptLines({ ...withGaps, gaps: ["b", "a"] }, "ai", ["a", "b"])[0].includes("found 2 gaps · you reordered them"));
+  check(s, "receipt credits found only for the AI's own gaps in its order", receiptLines({ ...withGaps, gaps: ["a", "b"] }, "ai", ["a", "b"])[0].includes("· found 2 gaps · mapped"));
   check(s, "receipt says worked from your gaps when the user set them", receiptLines(withGaps, "user")[0].includes("worked from your 2 gaps"));
   check(s, "receipt with no gaps says so", receiptLines({ ...withGaps, gaps: [], receipt: { ...d.receipt, gaps: 0 } })[0].includes("no gaps to match · chose 1 from"));
   eq(s, "rules alone, same course, no gaps", rulesAloneLine({ engine: "ai", pickId: "a", rulesPickId: "a", vsRules: "", gaps: [] }, "A"), "Rules alone pick the same course. The AI adds your weekly tasks.");
   eq(s, "engine line for an answer that failed the checks", engineLine({ engine: "rules", reason: "ai-invalid" }), "Chosen by Ascend's rules. The AI's answer didn't pass the checks, so these lines come from the catalog");
   eq(s, "rules alone, same course", rulesAloneLine({ engine: "ai", pickId: "a", rulesPickId: "a", vsRules: "" }, "A"), "Rules alone pick the same course. The AI adds the module match and your weekly tasks.");
   eq(s, "rules alone, different course", rulesAloneLine({ engine: "ai", pickId: "b", rulesPickId: "a", vsRules: "It fits better." }, "Course A"), "Rules alone would have picked Course A. It fits better.");
+  check(s, "the read-back never puts the preset starting point in quote marks", !/[“”"]/.test(readBackLine(p, "INR")), readBackLine(p, "INR"));
 });
 
 section("unit:chip-chain", () => {
@@ -1300,6 +1317,29 @@ section("unit:skim-after-chip", () => {
   check(s, "at least one persona keeps its pick with a shorter scope", tested > 0);
 });
 
+section("unit:receipt-after-chip", () => {
+  const s = "unit:receipt-after-chip";
+  // the AI mapped only the first two candidates; a chip that keeps its pick
+  // must not count a course keywords matched as the AI's work
+  let tested = 0;
+  for (const persona of personas) {
+    const p = persona.profile;
+    if (!isAvailableMove(p.move)) continue;
+    const base = fit(p, NO_ADJUST, { now: NOW });
+    if (base.candidates.length < 3) continue;
+    const rules = rulesDecision(p, NO_ADJUST, [], { now: NOW, fit: base });
+    const seen = base.candidates.slice(0, 2);
+    const aiCoverage = rules.coverage.filter((c) => seen.some((x) => x.id === c.id)).map((c) => ({ ...c, source: "ai" as const }));
+    const prev = { ...rules, engine: "ai" as const, origin: "pick" as const, pickId: seen[0].id, coverage: aiCoverage };
+    const res = adjustPick(prev, p, NO_ADJUST, [], { now: NOW });
+    const aiStill = res.response.coverage.filter((c) => c.source === "ai");
+    check(s, `${persona.id}: the receipt counts only courses the AI mapped`, res.response.receipt.courses === aiStill.length && aiStill.length <= 2, `${res.response.receipt.courses} vs ${aiStill.length}`);
+    tested++;
+    if (tested >= 3) break;
+  }
+  check(s, "at least one persona has three candidates", tested > 0);
+});
+
 section("unit:understood-by", () => {
   const s = "unit:understood-by";
   const situation = "Customer success manager, 3 years. I log feature requests and want to move into product.";
@@ -1328,6 +1368,9 @@ section("unit:hours-text", () => {
     ["5 hrs per week", 5],
     ["8+ hours a week", 8],
     ["4 hours on weekends", 4],
+    ["I work 45 hours a week and can study 3 hours a week.", 3],
+    ["Analyst at a bank, working 40 hours a week.", null],
+    ["After work I have 3 hours a week.", 3],
   ];
   for (const [t, want] of cases) eq(s, `hours from "${t}"`, hoursFromText(t), want);
 });
@@ -1348,6 +1391,14 @@ section("unit:numbers", () => {
   // hype, but never a real module name
   check(s, "a real module name with a hype word is not hype", !hasHype('Skim "Chapter 8: Supercharged Ideation" first.') && cleanProse('Skim "Chapter 8: Supercharged Ideation" first.', 100).text.length > 0);
   check(s, "hype is still blanked", hasHype("This will supercharge your career.") && cleanProse("This will supercharge your career.", 100).text === "");
+  // decimals and dotted names are not sentence ends
+  eq(s, "a rating sentence goes whole, not as a fragment", cleanProse("Rated 4.7 by learners, it starts from zero. It suits you.", 260).text, "It suits you.");
+  eq(s, "a 4.8 rating is caught", cleanProse("It has a 4.8 rating. It suits you.", 260).text, "It suits you.");
+  eq(s, "Next.js stays whole", sentences("Build it in Next.js. Then ship it."), ["Build it in Next.js.", "Then ship it."]);
+  for (const t of ["Covers 3 of 5 gaps", "49 dollars", "A 4.9 average", "It has 120 reviews"]) check(s, `matches "${t}"`, NUMBER_UNIT_RE.test(t));
+  const badNames = COURSES.flatMap((c) => c.modules.map((m) => m.name).filter((m) => !cleanProse(`Use "${m}" this week.`, 300).text.includes(m)));
+  check(s, "every catalog module name survives the text rules when quoted", badNames.length === 0, badNames.join(" | "));
+  check(s, "a cut never lands inside a decimal", cutToCap("Rated well. It is 4.7 good and more text here", 16) === "Rated well.");
   check(s, "flattery counts as hype", hasHype("This comprehensive course is the perfect next step."));
   check(s, "no catalog module name or title reads as hype", COURSES.every((c) => [c.title, ...c.modules.map((m) => m.name)].every((n) => !hasHype(n))));
 });
@@ -1367,8 +1418,24 @@ section("unit:pick-quotes", () => {
     verify({ finishReason: "stop", output: { coverage: [], pickId: ids[1], alternateIds: [], whyThisOne: "It fits.", vsRules: "", skim: [], mentionedVerdicts: [], useItAtWork: "Do it.", honestFit: "ok", gapNote: "", ...o }, candidates: r.candidates, exclude: [], rules, gaps: p.gaps, mentioned: p.mentioned, words: countWords(p.situation), rulesTopId: ids[0], situation: p.situation, names, templates: tmpl });
   const invented = run({ whyThisOne: "“Chapter 7: Writing the Product Spec” closes your first gap. It fits." });
   check(s, "an invented quoted module swaps the field for the template", invented.decision.whyThisOne === "Template why." && invented.decision.receipt.invalidModulesRemoved >= 1 && invented.checks.some((c) => c.name === "quotes" && !c.passed));
-  const para = run({ whyThisOne: 'You said "I want to become a product manager". It fits.' });
-  check(s, "a paraphrase of their words loses its quote marks, keeps its words", para.decision.whyThisOne === "You said I want to become a product manager. It fits.", para.decision.whyThisOne);
+  const para = run({ whyThisOne: 'It suits someone who wants "to become a product manager". It fits.' });
+  check(s, "a paraphrase of their words loses its quote marks, keeps its words", para.decision.whyThisOne === "It suits someone who wants to become a product manager. It fits.", para.decision.whyThisOne);
+  const saidQuote = run({ whyThisOne: 'You said "I want to become a product manager". It fits.' });
+  check(s, "a 'you said' quote they never wrote goes", saidQuote.decision.whyThisOne === "It fits.", saidQuote.decision.whyThisOne);
+  const preset = run({ vsRules: "You said you haven't owned a roadmap, so this starts lower." });
+  check(s, "the preset starting level is never repeated as their words", !/roadmap/i.test(preset.decision.vsRules) && preset.checks.some((c) => c.name === "quotes" && !c.passed), preset.decision.vsRules);
+  const theirs = run({ whyThisOne: "You said you log feature requests that mostly get ignored. It fits." });
+  check(s, "a 'you said' that repeats their words stays", theirs.decision.whyThisOne.startsWith("You said you log feature requests"), theirs.decision.whyThisOne);
+  const relative = run({ whyThisOne: "The certificate you mentioned covers scheduling and budgets. It fits." });
+  check(s, "'the course you mentioned covers...' is about the course, so it stays", relative.decision.whyThisOne.startsWith("The certificate you mentioned covers"), relative.decision.whyThisOne);
+  const since = run({ vsRules: "Since you said you work near PMs, it starts higher." });
+  check(s, "'Since you said ...' is checked against their words", !/work near PMs/i.test(since.decision.vsRules), since.decision.vsRules);
+  const later = skillLabel(p.gaps[2]).toLowerCase();
+  const wrongFirst = run({ whyThisOne: `It closes your ${later} gap first. It fits.` });
+  check(s, "whyThisOne never calls a later gap their first", !wrongFirst.decision.whyThisOne.toLowerCase().includes(later) && wrongFirst.checks.some((c) => c.name === "first gap" && !c.passed), wrongFirst.decision.whyThisOne);
+  const firstLabel = skillLabel(p.gaps[0]);
+  const long = run({ whyThisOne: `It starts from the work you described and walks through every step of the job in order, with plenty of practice along the way and clear examples from real teams. It closes ${firstLabel.toLowerCase()} directly with a worked exercise you can reuse at work.` });
+  check(s, "a long whyThisOne keeps the sentence that names their first gap", long.decision.whyThisOne.toLowerCase().includes(firstLabel.toLowerCase()) && long.decision.whyThisOne.length <= 260, long.decision.whyThisOne);
   const realModule = names[ids[1]][1];
   const real = run({ whyThisOne: `“${realModule}” is the place to start. You said "I want to move into product".` });
   check(s, "a real in-scope module and a verbatim quote keep their quote marks", real.decision.whyThisOne.includes(`“${realModule}”`) && real.decision.whyThisOne.includes('"I want to move into product"'), real.decision.whyThisOne);
@@ -1609,6 +1676,8 @@ async function anthropicWire(): Promise<void> {
     const headers: Headers[] = [];
     let reply = "{}";
     let stop = "end_turn";
+    let content: unknown[] | null = null;
+    let iterations: unknown[] | null = null;
     const fakeFetch = async (_url: RequestInfo | URL, init?: RequestInit) => {
       bodies.push(JSON.parse(String(init?.body ?? "{}")));
       headers.push(new Headers(init?.headers));
@@ -1618,10 +1687,10 @@ async function anthropicWire(): Promise<void> {
           type: "message",
           role: "assistant",
           model: "claude-opus-5-5",
-          content: [{ type: "text", text: reply }],
+          content: content ?? [{ type: "text", text: reply }],
           stop_reason: stop,
           stop_sequence: null,
-          usage: { input_tokens: 1, output_tokens: 1 },
+          usage: { input_tokens: 1, output_tokens: 1, ...(iterations ? { iterations } : {}) },
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -1677,6 +1746,21 @@ async function anthropicWire(): Promise<void> {
       const tRes = await call(TAILOR_SYSTEM, JSON.stringify(buildTailorInput({ profile: prof, course, weeks })), tailorOutputSchema);
       const tv = verifyTailoring({ finishReason: tRes.finishReason, output: tRes.output, weeks, artifactTemplate: MOVES[prof.move].artifact });
       check(s, "tailor: the parsed reply passes the verifier with W tasks", tv.ok && tv.tasks.length === weeks.length);
+
+      // a turn the server-side fallback served: only the text after the
+      // hand-over is the answer, and the model named is the one that wrote it
+      const usageOf = (type: string, model?: string) => ({ type, ...(model ? { model } : {}), input_tokens: 1, output_tokens: 1, cache_creation: null, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 });
+      content = [
+        { type: "text", text: '{"pickId":' },
+        { type: "fallback", from: { model: MODEL }, to: { model: "claude-opus-4-8" }, trigger: { type: "refusal" } },
+        { type: "text", text: JSON.stringify(mockPickOutput(input)) },
+      ];
+      iterations = [usageOf("message"), usageOf("fallback_message", "claude-opus-4-8")];
+      const fb = await call(SYSTEM, JSON.stringify(input), pickOutputSchema(ids));
+      content = null;
+      iterations = null;
+      check(s, "a fallback-served answer names the model that wrote it and parses only its text", fb.model === "claude-opus-4-8" && fb.finishReason === "stop", `${fb.model} ${fb.finishReason}`);
+      eq(s, "an ordinary answer names the model that answered", pRes.model, "claude-opus-5-5");
 
       // a cut-off reply and a refusal both come back as something other than "stop"
       reply = '{"pickId":"';
@@ -1851,7 +1935,7 @@ async function main() {
               medianMs: aiRuns.map((r) => r.ms ?? 0).sort((a, b) => a - b)[Math.floor(aiRuns.length / 2)],
               specificTailoredTasks: tailoredTasks ? specificTasks / tailoredTasks : null,
             }
-          : "skipped (AI_API_KEY not set)",
+          : "skipped (ANTHROPIC_API_KEY not set)",
         personas: personas.map((p) => {
           const r = fit(p.profile, NO_ADJUST, { now: NOW });
           const d = rulesDecision(p.profile, NO_ADJUST, [], { now: NOW, fit: r });

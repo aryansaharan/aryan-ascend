@@ -202,7 +202,13 @@ function reducer(s: State, a: Action): State {
         und: { status: "done", text: a.text, response: a.response },
         check: checkStateFrom(u, a.saved),
       };
-      return u.hoursChip ? prefillHours(next, u.hoursMentioned ?? u.hoursChip) : next;
+      if (u.hoursChip) return prefillHours(next, u.hoursMentioned ?? u.hoursChip);
+      // The AI read no study hours (say, only working hours): a prefill from
+      // code's quick read goes, unless they have already moved past Time.
+      if (isAiEngine(a.response.engine) && s.hoursFrom === "text" && s.step <= 1) {
+        return { ...next, hours: null, hoursFrom: null, hoursSaid: null };
+      }
+      return next;
     }
     case "check":
       return { ...s, check: a.check };
@@ -270,7 +276,13 @@ function firstState({ example, edit }: { example: ExampleProfile | null; edit: b
       check: null,
     };
   }
-  const d = loadProfile();
+  // "Use my own answers" after an example: a saved example is not their own
+  // draft, so step 1 starts blank instead of holding the example's words.
+  const d0 = loadProfile();
+  const isExample =
+    typeof d0.situation === "string" &&
+    EXAMPLES.some((e) => cleanSituation(e.situation) === cleanSituation(d0.situation as string));
+  const d: ProfileDraft = isExample ? {} : d0;
   return {
     step: 0,
     text: typeof d.situation === "string" ? d.situation.slice(0, LIMITS.situationMax) : "",

@@ -91,6 +91,59 @@ const HYPE_SAFE: string[] = [
   ),
 ].sort((a, b) => b.length - a.length);
 
+// Quoted catalog names ------------------------------------------------------------
+//
+// A real module name or title in quote marks is copied text: a "!" in
+// "Chapter 3: Clutter is your enemy!" or the "Three Months" in "Your First
+// Three Months" is part of the name, not the model's style or a number it
+// stated. The text rules mask such quotes while they work, so the name comes
+// through untouched. Only exact catalog names count.
+
+const QUOTABLE = new Set(
+  COURSES.flatMap((c) => [c.title, ...c.modules.map((m) => m.name), ...(c.beyond ? [c.beyond.label] : [])]).map((n) =>
+    n.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim(),
+  ),
+);
+const MASK_RE = /\uE000([a-z]+)\uE001/g;
+
+function maskKey(i: number): string {
+  let k = "";
+  let n = i;
+  do {
+    k = String.fromCharCode(97 + (n % 26)) + k;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return k;
+}
+
+function maskIndex(k: string): number {
+  let n = 0;
+  for (const ch of k) n = n * 26 + (ch.charCodeAt(0) - 96);
+  return n - 1;
+}
+
+/** Replaces each quoted exact catalog name with a placeholder no text rule matches. */
+export function maskQuotedNames(text: string, names: readonly string[] | Set<string> = QUOTABLE): { text: string; quotes: string[] } {
+  const allowed = names instanceof Set ? names : new Set(names.map((n) => n.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim()));
+  const quotes: string[] = [];
+  const out = text.replace(/["“]([^"”]{1,200})["”]/g, (whole, inner: string) => {
+    if (!allowed.has(inner.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim())) return whole;
+    quotes.push(whole);
+    return `\uE000${maskKey(quotes.length - 1)}\uE001`;
+  });
+  return { text: out, quotes };
+}
+
+/** Puts the masked quotes back. */
+export function unmaskQuotedNames(text: string, quotes: readonly string[]): string {
+  return quotes.length ? text.replace(MASK_RE, (whole, k: string) => quotes[maskIndex(k)] ?? whole) : text;
+}
+
+/** An em or en dash, or an exclamation mark, outside quoted catalog names. */
+export function hasDash(t: string): boolean {
+  return HAS_DASH.test(maskQuotedNames(t).text);
+}
+
 /** Hype in the text, ignoring real module names and titles that happen to match. */
 export function hasHype(t: string): boolean {
   let s = t;
@@ -173,9 +226,19 @@ export function isAiOutput(x: unknown): x is AiOutput {
 
 // Text helpers (shared with the understand and tailor verifiers) ----------------
 
-/** Splits prose into sentences, keeping their end punctuation. */
+/**
+ * Splits prose into sentences, keeping their end punctuation. A sentence ends
+ * at ".", "!" or "?" (plus any closing quote or bracket) followed by a space,
+ * so "4.7", "Next.js" and "Unit 2.1" stay whole.
+ */
 export function sentences(text: string): string[] {
-  return (text.match(/[^.!?]+(?:[.!?]+["'”’)]*|$)/g) ?? [])
+  const m = maskQuotedNames(text);
+  return splitSentences(m.text).map((s) => unmaskQuotedNames(s, m.quotes));
+}
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?]["'”’)]*)\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -186,14 +249,18 @@ export function sentences(text: string): string[] {
  * "your 3 years in support", may stay). Returns the text and how many went.
  */
 export function stripNumberSentences(text: string, situation = ""): { text: string; removed: number } {
-  const all = sentences(text);
+  // a quoted catalog name ("Your First Three Months") is not a number the model stated
+  const m = maskQuotedNames(text);
+  const all = splitSentences(m.text);
   const kept = all.filter((s) => !hasUnbackedNumber(s, situation));
-  return { text: kept.join(" "), removed: all.length - kept.length };
+  return { text: unmaskQuotedNames(kept.join(" "), m.quotes), removed: all.length - kept.length };
 }
 
 /** Replaces em and en dashes with ", " and exclamation marks with full stops, and tidies the spacing they leave. */
 export function replaceDashes(text: string): string {
-  return text
+  // quoted catalog names keep their own punctuation
+  const m = maskQuotedNames(text);
+  const out = m.text
     .replace(/!+/g, ".")
     .replace(/\.{2,}/g, ".")
     .replace(DASH_RE, ", ")
@@ -201,15 +268,102 @@ export function replaceDashes(text: string): string {
     .replace(/^\s*,\s*/, "")
     .replace(/\s*,\s*([.!?])/g, "$1")
     .trim();
+  return unmaskQuotedNames(out, m.quotes);
 }
 
-/** Cuts to the last sentence end within `cap` characters; null when there is none. */
+/**
+ * Cuts to the last sentence end within `cap` characters; null when there is
+ * none. A sentence end is followed by a space in the full text, so a cap that
+ * lands on "4." of "4.7" doesn't count as one.
+ */
 export function cutToCap(text: string, cap: number): string | null {
   if (text.length <= cap) return text;
-  const head = text.slice(0, cap);
-  const m = head.match(/^[\s\S]*[.!?]["'”’)]*(?=\s|$)/);
-  const cut = m ? m[0].trim() : "";
-  return cut.length > 0 ? cut : null;
+  // never cut inside a quoted catalog name ("What Makes Employees Work? Money, Of Course!")
+  const masked = maskQuotedNames(text);
+  let best = "";
+  for (const m of masked.text.matchAll(/[.!?]+["'”’)]*(?=\s|$)/g)) {
+    const e = (m.index ?? 0) + m[0].length;
+    const head = unmaskQuotedNames(masked.text.slice(0, e), masked.quotes).trim();
+    if (head.length > cap) break;
+    best = head;
+  }
+  return best.length > 0 ? best : null;
+}
+
+/**
+ * Like cutToCap, but when the sentences that fit name none of `labels` and a
+ * sentence that does would fit, that sentence is kept instead, so the line
+ * still names the gap it is about.
+ */
+export function cutToCapKeeping(text: string, cap: number, labels: readonly string[]): string | null {
+  if (text.length <= cap) return text;
+  const named = (s: string) => labels.some((l) => l && s.toLowerCase().includes(l.toLowerCase()));
+  const plain = cutToCap(text, cap);
+  if (labels.length === 0 || (plain && named(plain))) return plain;
+  const all = sentences(text);
+  const first = all[0] ?? "";
+  const hit = all.find((s) => named(s) && s.length <= cap);
+  if (!hit) return plain;
+  const both = hit !== first ? `${first} ${hit}` : hit;
+  return both.length <= cap ? both : hit;
+}
+
+// "You said ..." -----------------------------------------------------------------
+
+/** "you said", "you wrote", "you mentioned", "you told us" (optionally "you've"). */
+const SAID_RE = /\byou(?:'ve|\s+have)?\s+(?:said|wrote|written|mentioned|told\s+us|noted)\b(?:\s+that)?/i;
+/** Words after which "you said" starts a clause of its own ("Since you said ..."). */
+const CLAUSE_START = new Set(["and", "but", "because", "since", "as", "so", "while", "although", "though", "if", "when", "where", "which"]);
+/** Where the reported words end: punctuation, or the model's own reasoning starting. */
+const SAID_END = /[,;:.!?]|\s(?:so|which|because|but|while|and\s+(?:this|that|it))\s/i;
+const SAID_STOP = new Set([
+  "you", "your", "yours", "have", "has", "had", "haven't", "hasn't", "are", "aren't", "was", "were", "the", "and",
+  "but", "for", "with", "that", "this", "these", "those", "them", "they", "their", "there", "its", "into", "from",
+  "about", "just", "also", "still", "want", "wants", "wanted", "would", "like", "can", "can't", "could", "will",
+  "won't", "been", "being", "any", "some", "much", "many", "more", "most", "very", "really", "only", "all", "own",
+  "get", "got", "one", "out", "now", "yet", "not", "don't", "didn't", "doesn't", "isn't", "what", "when", "where",
+  "who", "how", "why", "which", "then", "than", "too", "did", "does", "you're", "you've", "already", "currently",
+]);
+
+/**
+ * True when a sentence says the person said, wrote or mentioned something
+ * their own text doesn't back: every content word of the reported words must
+ * appear in what they wrote (a shared first four letters is enough, so
+ * "logged" matches "log"), unless the reported words are a quote of theirs.
+ * Catches a preset starting level repeated as their words ("you said you
+ * haven't owned a roadmap").
+ */
+export function saidUnbacked(sentence: string, situation: string): boolean {
+  const m = SAID_RE.exec(sentence);
+  if (!m) return false;
+  // "the course you mentioned covers..." is a relative clause: what follows is
+  // about the course, not their words. Only a "you said" that starts a clause counts.
+  const before = sentence.slice(0, m.index).trim();
+  const prev = (before.split(/\s+/).pop() ?? "").toLowerCase();
+  if (before && !/[,;:(]$/.test(before) && !CLAUSE_START.has(prev)) return false;
+  let clause = sentence.slice(m.index + m[0].length);
+  const quoted = clause.match(/^\s*["“]([^"”]{2,200})["”]/);
+  if (quoted) return !isVerbatim(quoted[1], situation);
+  const end = clause.search(SAID_END);
+  if (end >= 0) clause = clause.slice(0, end);
+  const norm = (s: string) => s.toLowerCase().replace(/[‘’ʼ]/g, "'");
+  const theirs = norm(situation).match(/[a-z0-9][a-z0-9'+#]*/g) ?? [];
+  const content = (norm(clause).match(/[a-z0-9][a-z0-9'+#]*/g) ?? []).filter(
+    (w) => w.length >= 3 && !SAID_STOP.has(w),
+  );
+  const backed = (w: string) =>
+    theirs.some((t) => {
+      const k = Math.min(w.length, t.length, 4);
+      return k >= 3 && w.slice(0, k) === t.slice(0, k);
+    });
+  return content.some((w) => !backed(w));
+}
+
+/** Drops every sentence that says they wrote something they didn't (saidUnbacked). */
+export function stripUnbackedSaid(text: string, situation: string): { text: string; removed: number } {
+  const all = sentences(text);
+  const kept = all.filter((s) => !saidUnbacked(s, situation));
+  return { text: kept.join(" "), removed: all.length - kept.length };
 }
 
 /**
@@ -225,7 +379,7 @@ export function cleanProse(
   let t = typeof text === "string" ? text.replace(/\s+/g, " ").trim() : "";
   const r = stripNumberSentences(t, situation);
   t = r.text;
-  const dashes = HAS_DASH.test(t);
+  const dashes = hasDash(t);
   if (dashes) t = replaceDashes(t);
   const hype = hasHype(t);
   if (hype) t = "";
@@ -451,10 +605,35 @@ export function verify(input: VerifyInput): VerifyResult {
   numbers += removed;
   check(checks, "no numbers", [removed ? `Removed ${plural(removed, "sentence")} with a number.` : ""]);
 
+  // "you said ..." must be something they said (the starting level is a preset, not their words)
+  let saidDropped = 0;
+  for (const f of FIELDS) {
+    const r = stripUnbackedSaid(text[f], situation);
+    saidDropped += r.removed;
+    if (r.removed) text[f] = r.text;
+  }
+
+  // whyThisOne never calls a later gap their first one
+  const gapLabels0 = input.gaps.map((g) => skillLabel(g).toLowerCase());
+  let firstGapFixed = false;
+  if (gapLabels0.length > 1 && text.whyThisOne) {
+    const kept = sentences(text.whyThisOne).filter((s) => {
+      const low = s.toLowerCase();
+      if (!/\bfirst\b/.test(low) || low.includes(gapLabels0[0])) return true;
+      // "it doesn't cover your first gap" is the honest version, not a claim
+      // ("before anything else" is emphasis, not a negation, so it doesn't count)
+      if (/\b(?:not|doesn't|does not|isn't|won't|skips|rather than|instead of)\b/.test(low)) return true;
+      const namesOther = gapLabels0.slice(1).some((l) => low.includes(l));
+      if (namesOther) firstGapFixed = true;
+      return !namesOther;
+    });
+    if (firstGapFixed) text.whyThisOne = kept.join(" ");
+  }
+
   let dashes = 0;
   const swapped: Field[] = [];
   for (const f of FIELDS) {
-    if (HAS_DASH.test(text[f])) {
+    if (hasDash(text[f])) {
       dashes++;
       text[f] = replaceDashes(text[f]);
     }
@@ -507,7 +686,10 @@ export function verify(input: VerifyInput): VerifyResult {
   const cut: Field[] = [];
   for (const f of FIELDS) {
     if (text[f].length <= FIELD_CAPS[f]) continue;
-    text[f] = cutToCap(text[f], FIELD_CAPS[f]) ?? tmpl[f];
+    // a long whyThisOne keeps the sentence that names their gap
+    const short =
+      f === "whyThisOne" ? cutToCapKeeping(text[f], FIELD_CAPS[f], gapLabels) : cutToCap(text[f], FIELD_CAPS[f]);
+    text[f] = short ?? tmpl[f];
     cut.push(f);
   }
   check(checks, "length", [cut.length ? `Shortened ${cut.join(", ")}.` : ""]);
@@ -555,7 +737,9 @@ export function verify(input: VerifyInput): VerifyResult {
     }
     const r = cleanProse(s.reason, FIELD_CAPS.skim, situation);
     numbers += r.numbers;
-    let reason = r.text;
+    const sd = stripUnbackedSaid(r.text, situation);
+    saidDropped += sd.removed;
+    let reason = sd.text;
     if (reason && quoteChecks) {
       const q = checkQuotes(reason, verdictAllowed(-1), situation);
       if (q.invented) {
@@ -588,7 +772,9 @@ export function verify(input: VerifyInput): VerifyResult {
     let verdict = v.verdict as Verdict;
     const r = cleanProse(v.reason, FIELD_CAPS.verdict, situation);
     numbers += r.numbers;
-    let reason = r.text;
+    const sd = stripUnbackedSaid(r.text, situation);
+    saidDropped += sd.removed;
+    let reason = sd.text;
     if (reason && quoteChecks) {
       const q = checkQuotes(reason, verdictAllowed(v.index), situation);
       if (q.invented) {
@@ -618,14 +804,16 @@ export function verify(input: VerifyInput): VerifyResult {
   }
   verdicts.sort((a, b) => a.index - b.index);
   check(checks, "verdicts", [verdictFixes ? `Fixed ${plural(verdictFixes, "verdict")}.` : ""]);
-  if (quoteChecks) {
+  if (quoteChecks || saidDropped) {
     check(checks, "quotes", [
       unquoted ? "Removed quote marks from words you didn't write." : "",
       inventedFields
         ? `Replaced ${plural(inventedFields, "line")} that named a module not in the course with the template.`
         : "",
+      saidDropped ? `Removed ${plural(saidDropped, "sentence")} that said you wrote something you didn't.` : "",
     ]);
   }
+  check(checks, "first gap", [firstGapFixed ? "Removed a sentence that called a later gap your first." : ""]);
 
   return {
     decision: {

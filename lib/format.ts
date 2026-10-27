@@ -367,7 +367,8 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
  * title-cased word by word.
  */
 export function modelLabel(model: string = DEFAULT_MODEL): string {
-  const claude = /^claude-([a-z]+)-(\d+)(?:-(\d+))?$/.exec(model);
+  // a dated canonical id ("claude-sonnet-4-5-20250929") reads the same as its alias
+  const claude = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(model);
   if (claude) {
     const [, family, major, minor] = claude;
     return `Claude ${family[0].toUpperCase()}${family.slice(1)} ${major}${minor ? `.${minor}` : ""}`;

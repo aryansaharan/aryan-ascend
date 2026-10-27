@@ -52,20 +52,40 @@ function Row({ label, tag, children }: { label: string; tag?: string; children: 
 }
 
 /**
+ * True when the AI chose from exactly these courses: the list on screen is the
+ * one it was sent. A chip that keeps the AI's pick but changes the list makes
+ * this false. Without `candidateIds` (a caller that can't tell), true.
+ */
+export function aiSawThese(decision: Decision | null, candidateIds?: readonly string[]): boolean {
+  if (!decision?.sent || candidateIds === undefined) return true;
+  const sent = decision.sent.candidateIds;
+  return sent.length === candidateIds.length && sent.every((id) => candidateIds.includes(id));
+}
+
+/**
  * The funnel's last stage depends on who chose: on the AI path code hands the
  * finishable courses to the AI (the "chose 1" pill moves to the AI row); on
- * the rules path code picks, so the pill stays in the rules row.
+ * the rules path code picks, so the pill stays in the rules row. "{n} to the
+ * AI" shows only while the courses on screen are the ones the AI was sent
+ * (pass `candidateIds`, the current fit() candidates); after a chip changes
+ * them the funnel ends in "1 pick", counted from today's list.
  */
-export function ledgerStages(stages: FunnelStage[], decision: Decision | null): FunnelStage[] {
+export function ledgerStages(
+  stages: FunnelStage[],
+  decision: Decision | null,
+  candidateIds?: readonly string[],
+): FunnelStage[] {
   if (!decision || !isAiEngine(decision.engine) || decision.origin === "swapped" || decision.origin === "adjusted") {
     return stages;
   }
+  if (!aiSawThese(decision, candidateIds)) return stages;
   const sent = decision.sent?.candidateIds.length ?? decision.receipt.courses;
   return stages.map((s) => (s.key === "pick" ? { key: "sent", count: sent, suffix: "to the AI" } : s));
 }
 
 export function WorkLedger({
   stages,
+  candidateIds,
   decision,
   understoodBy,
   aiGapIds,
@@ -78,6 +98,8 @@ export function WorkLedger({
   className,
 }: {
   stages: FunnelStage[];
+  /** the fit() candidates on screen, so "{n} to the AI" shows only while they are what the AI saw */
+  candidateIds?: readonly string[];
   decision: Decision | null;
   understoodBy: "ai" | "user";
   aiGapIds?: readonly SkillId[] | null;
@@ -156,7 +178,7 @@ export function WorkLedger({
       <Row label="Rules" tag="code">
         <Funnel
           key={funnelKey}
-          stages={ledgerStages(stages, decision)}
+          stages={ledgerStages(stages, decision, candidateIds)}
           play={play}
           hold={hold}
           onHeld={onHeld}

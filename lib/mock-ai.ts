@@ -287,7 +287,7 @@ export function mockPickOutput(input: AiInput): AiOutput {
   const others = scored.filter((s) => s.c.id !== input.rulesTopId);
   const top = scored.find((s) => s.c.id === input.rulesTopId) ?? scored[0];
   const move = Object.values(MOVES).find((m) => m.label === input.person.direction);
-  const startingOut = move ? move.anchors.indexOf(input.person.startingPoint) === 0 : false;
+  const startingOut = move ? move.anchors.indexOf(input.person.startingLevel) === 0 : false;
   // A challenger must be startable: nothing assumed they never mentioned, and
   // never a step up for someone at the first starting point.
   const startable = (x: Scored) => x.c.assumesMet !== false && !(startingOut && x.c.levelVsYou === "one step up");
@@ -328,7 +328,9 @@ export function mockPickOutput(input: AiInput): AiOutput {
   const strength = input.strengths[0];
   const why1 =
     moduleName && gapLabel
-      ? `“${moduleName}” works on ${gapLabel}, the first gap it closes for you.`
+      ? firstCovered?.gap === 0
+        ? `“${moduleName}” works on ${gapLabel}, your first gap.`
+        : `“${moduleName}” works on ${gapLabel}. It doesn't cover your first gap.`
       : `It is the closest match to what you wrote about your work.`;
   const missing = pick.c.missing ?? [];
   const why2 =

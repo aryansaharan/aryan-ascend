@@ -171,8 +171,10 @@ export async function tailorPlan(args: TailorArgs): Promise<TailorResponse> {
       artifactTemplate: MOVES[p.move].artifact,
       situation: p.situation,
     });
+    // the model that wrote the answer (a fallback model, if one served the turn)
+    const answeredBy = answer.model ?? modelName;
     if (!v.ok) {
-      return rulesTailoring(weeks, p.move, "ai-invalid", { checks: v.checks, ms, model: modelName, raw: answer.raw, sent: input });
+      return rulesTailoring(weeks, p.move, "ai-invalid", { checks: v.checks, ms, model: answeredBy, raw: answer.raw, sent: input });
     }
     const response: TailorResponse = {
       engine,
@@ -182,7 +184,7 @@ export async function tailorPlan(args: TailorArgs): Promise<TailorResponse> {
       artifactTailored: v.artifactTailored,
       checks: v.checks,
       ms,
-      model: modelName,
+      model: answeredBy,
       ...(answer.raw !== undefined ? { raw: answer.raw } : {}),
       sent: input,
     };

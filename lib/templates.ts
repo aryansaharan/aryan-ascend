@@ -28,7 +28,8 @@ import type {
 } from "./pick-types";
 
 // Code-written copy. Every line here is a template filled from the catalog or
-// the user's answers, so it may carry numbers. The model's text never does.
+// the user's answers, so it may carry numbers. The model's text carries only
+// figures the person wrote themselves.
 
 function sentence(s: string): string {
   const t = s.trim();
@@ -116,10 +117,22 @@ export function weakFitNote(gapNote: string): string {
   return `This is the closest fit in Ascend's list, not a strong one. ${gapNote}`.trim();
 }
 
-/** Read-back line: `{role}. {Move}, starting from "{anchor}". {h} hours a week, {budget}.` */
+/**
+ * Read-back line: `{role}. {Move}, at the starting point you confirmed
+ * ({anchor}). {h} hours a week, {budget}.` The anchor is one of three preset
+ * levels, not the person's words, so it is never shown in quotation marks.
+ */
 export function readBackLine(profile: FitProfile, currency: DisplayCurrency): string {
   const move = MOVES[profile.move];
-  return `${roleInSentence(profile.currentRole)}. ${move.label}, starting from “${move.anchors[profile.baseline]}”. ${hoursAWeek(profile.hoursPerWeek)}, ${budgetPhrase(profile.budget, currency)}.`;
+  return `${roleInSentence(profile.currentRole)}. ${move.label}, at the starting point you confirmed (${lowerAnchor(move.anchors[profile.baseline])}). ${hoursAWeek(profile.hoursPerWeek)}, ${budgetPhrase(profile.budget, currency)}.`;
+}
+
+/** "I've used ChatGPT, never the API" reads "I've used ChatGPT, never the API"; "Spreadsheets, no SQL yet" reads "spreadsheets, no SQL yet". */
+function lowerAnchor(anchor: string): string {
+  const first = anchor.split(/\s+/)[0] ?? "";
+  // "I", "I've", "I'm" and acronyms keep their capitals
+  if (/^I(?:'|’|$)/.test(first) || (first.length > 1 && first === first.toUpperCase())) return anchor;
+  return anchor.charAt(0).toLowerCase() + anchor.slice(1);
 }
 
 /** Shown when the scope is trimmed: "Start with {scope}. About {w} weeks. Decide on the rest after." */
@@ -209,7 +222,7 @@ export function noAiCallLine(reason: PickReason | undefined): string {
 export const WHY_IT_WORKS: [string, string, string] = [
   "Code checks every course against your hours, level and budget first.",
   "The AI chooses among what's left and can only return courses from that list.",
-  "Code checks the answer and removes any sentence that states a time, price, rating or share, because those come from the catalog.",
+  "Code checks the answer and removes any sentence that states a time, price, rating or share you didn't write, because those come from the catalog.",
 ];
 
 const CHECK_LABELS: Record<"understand" | "pick" | "tailor", Record<string, string>> = {
@@ -228,7 +241,8 @@ const CHECK_LABELS: Record<"understand" | "pick" | "tailor", Record<string, stri
     coverage: "Every module it mapped exists in that course's scope",
     "no numbers": "No times, prices or ratings the catalog doesn't back",
     style: "No dashes, exclamation marks or hype",
-    quotes: "Quotes are real module names or your own words",
+    quotes: "Quotes are real module names or your own words, and so is anything it says you wrote",
+    "first gap": "Only your first gap is called your first",
     length: "Each line fits its length limit",
     empty: "No line was left empty",
     gapNote: "A gap note only when the fit is weak",
@@ -379,9 +393,9 @@ export function startedLine(hours: number): string {
 export function planEngineLine(te: Engine, model?: string): string {
   const tasks =
     te === "ai"
-      ? `tasks tailored by ${modelLabel(model)} once, when you made the plan`
+      ? `tasks tailored once by ${modelLabel(model)}`
       : te === "mock"
-        ? `tasks by ${MOCK_LABEL} once, when you made the plan`
+        ? `tasks written once by ${MOCK_LABEL}`
         : "tasks from Ascend's templates";
   return `Weeks built in code from the course outline · ${tasks} · opening this link makes no AI call`;
 }
@@ -401,12 +415,13 @@ function count(n: number, one: string, many: string): string {
  * The receipt under the pick card, counted by code, without the leading "// ".
  * AI path: "AI read your {words} words · found {g} gaps · mapped {m} modules
  * across {c} courses · chose 1" and "Code checked: {x} invented courses ·
- * {y} invented modules · every number from the catalog". Rules path: one line.
+ * {y} invented modules · every hour and price from the catalog". Rules path: one line.
  * Empty when nothing was picked. `understoodBy` comes from the profile: gaps
  * the user set by hand are "used", not "found". With `aiGapIds` (the gaps the
- * AI's own reading named), the AI is credited only when every gap the pick
- * used is one of them; null means that reading isn't on this device, so it
- * isn't credited.
+ * AI's own reading named, in its order), the AI is credited with "found" only
+ * when the pick used exactly those gaps in that order; any edit on Check is
+ * said ("you reordered them", "you changed them to N"). null means that
+ * reading isn't on this device, so it isn't credited.
  */
 export function receiptLines(
   d: {
@@ -424,7 +439,7 @@ export function receiptLines(
   if (!d.pickId) return [];
   const r = d.receipt;
   const aiWork = (d.coverage ?? []).some((c) => c.source !== "keywords");
-  const checked = `Code checked: ${count(r.invalidIdsRemoved, "invented course", "invented courses")} · ${count(r.invalidModulesRemoved, "invented module", "invented modules")} · every number from the catalog`;
+  const checked = `Code checked: ${count(r.invalidIdsRemoved, "invented course", "invented courses")} · ${count(r.invalidModulesRemoved, "invented module", "invented modules")} · every hour and price from the catalog`;
   if (d.origin === "swapped" || d.origin === "adjusted") {
     if (!aiWork) return [`Chosen by rules from ${count(r.courses, "course", "courses")}, matched by keywords`];
     const tail = d.origin === "swapped" ? "you chose this one" : "rules re-ranked after your change";
@@ -438,18 +453,18 @@ export function receiptLines(
   const lead = d.engine === "mock" ? `${MOCK_LABEL} · read` : "AI read";
   const read = `${lead} your ${count(r.words, "word", "words")}`;
   if (r.gaps === 0) return [`${read} · no gaps to match · chose 1 from ${count(r.courses, "course", "courses")}`, checked];
-  // The AI is credited with the gaps only when its own reading named every one the pick used.
-  const credited =
-    understoodBy === "ai" &&
-    (aiGapIds === undefined || (aiGapIds !== null && (d.gaps ?? []).every((g) => aiGapIds.includes(g))));
-  const sameAsAi =
-    !!aiGapIds && aiGapIds.length === (d.gaps ?? []).length && (d.gaps ?? []).every((g) => aiGapIds.includes(g));
+  // "found" only when the pick used exactly the gaps the AI's reading named, in its order.
+  const used = d.gaps ?? [];
+  const sameSet = !!aiGapIds && aiGapIds.length === used.length && used.every((g) => aiGapIds.includes(g));
+  const sameOrder = sameSet && used.every((g, i) => aiGapIds?.[i] === g);
   const gapPart =
-    credited || sameAsAi
-    ? `found ${count(r.gaps, "gap", "gaps")}`
-    : aiGapIds && aiGapIds.length > 0
-      ? `found ${count(aiGapIds.length, "gap", "gaps")} · you changed them to ${r.gaps}`
-      : `worked from your ${count(r.gaps, "gap", "gaps")}`;
+    sameOrder || (understoodBy === "ai" && aiGapIds === undefined)
+      ? `found ${count(r.gaps, "gap", "gaps")}`
+      : sameSet
+        ? `found ${count(r.gaps, "gap", "gaps")} · you reordered them`
+        : aiGapIds && aiGapIds.length > 0
+          ? `found ${count(aiGapIds.length, "gap", "gaps")} · you changed them to ${r.gaps}`
+          : `worked from your ${count(r.gaps, "gap", "gaps")}`;
   return [
     `${read} · ${gapPart} · mapped ${count(r.modulesMapped, "module", "modules")} across ${count(r.courses, "course", "courses")} · chose 1`,
     checked,
@@ -459,7 +474,8 @@ export function receiptLines(
 /**
  * "Rules alone would have picked {title}. {vsRules}" when the AI chose
  * differently, the "same course" line when it agreed, null on the rules path
- * or after a swap or chip.
+ * or after a swap or a chip that re-ranked. The pick page also hides it after
+ * a chip that kept the AI's pick but changed the list it chose from.
  */
 export function rulesAloneLine(
   d: {

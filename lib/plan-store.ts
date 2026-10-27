@@ -1,5 +1,6 @@
 import { MOVE_IDS, outlineHash, type Baseline, type Course, type MoveId } from "./course-types";
 import { backupSlot, isObstacle, type Obstacle } from "./booking";
+import { courseById } from "./catalog";
 import { maxPlanN } from "./fit";
 import { restartList, type Restart } from "./plan-build";
 import { HAS_DASH, HYPE_RE, NUMBER_UNIT_RE, URL_RE } from "./text-rules";
@@ -292,10 +293,28 @@ function isIso(v: unknown): v is string {
   return ms > MIN_MS && ms < MAX_MS;
 }
 
-/** Text a link may show as the AI's: no dashes, links, stated numbers or hype (quoted module names aside). */
-function linkTextOk(t: string): boolean {
+/** A Claude model id ("claude-opus-5-5", "claude-sonnet-4-5-20250929"): the only kind a plan names. */
+const MODEL_ID_RE = /^claude-[a-z]+-\d+(?:-\d{1,2})?(?:-\d{8})?$/;
+
+function normName(s: string): string {
+  return s.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Text a link may show as the AI's: no dashes, links, stated numbers or hype.
+ * A quoted module name of the plan's own course is copied text, so its "!" or
+ * "Three Months" doesn't count; hype inside any quote doesn't either.
+ */
+function linkTextOk(t: string, names: ReadonlySet<string> = new Set()): boolean {
+  const masked = t.replace(/["“]([^"”]{1,200})["”]/g, (whole, inner: string) => (names.has(normName(inner)) ? " " : whole));
   const outsideQuotes = t.replace(/["“][^"”]*["”]/g, " ");
-  return !HAS_DASH.test(t) && !URL_RE.test(t) && !NUMBER_UNIT_RE.test(t) && !HYPE_RE.test(outsideQuotes);
+  return !HAS_DASH.test(masked) && !URL_RE.test(t) && !NUMBER_UNIT_RE.test(masked) && !HYPE_RE.test(outsideQuotes);
+}
+
+/** The plan course's title and module names, as linkTextOk compares them. */
+function courseNames(id: string): Set<string> {
+  const c = courseById(id);
+  return new Set(c ? [c.title, ...c.modules.map((m) => m.name)].map(normName) : []);
 }
 
 /**
@@ -306,12 +325,31 @@ function linkTextOk(t: string): boolean {
  */
 function recheckLinkText(p: PlanPayloadV2): PlanPayloadV2 {
   const next: PlanPayloadV2 = { ...p };
-  if (next.w && !linkTextOk(next.w)) delete next.w;
-  if (next.ta && !linkTextOk(next.ta)) delete next.ta;
+  // The dev-only mock never answers in production, so a link that says it did
+  // (made on a dev server, or edited) shows Ascend's templates instead.
+  if (process.env.NODE_ENV === "production") {
+    if (next.e === "mock") {
+      next.e = "rules";
+      delete next.w;
+      delete next.sk;
+    }
+    if (next.te === "mock") {
+      delete next.tw;
+      delete next.ta;
+      delete next.tf;
+      delete next.tm;
+      next.te = "rules";
+    }
+  }
+  // only a Claude model id is named as the one that tailored the tasks
+  if (next.tm !== undefined && !MODEL_ID_RE.test(next.tm)) delete next.tm;
+  const names = courseNames(next.c);
+  if (next.w && !linkTextOk(next.w, names)) delete next.w;
+  if (next.ta && !linkTextOk(next.ta, names)) delete next.ta;
   if (next.tw) {
     const tf = new Set(next.tf ?? []);
     next.tw.forEach((t, i) => {
-      if (!linkTextOk(t)) tf.add(i + 1);
+      if (!linkTextOk(t, names)) tf.add(i + 1);
     });
     if (tf.size) next.tf = [...tf].sort((a, b) => a - b);
     if (next.tw.every((_, i) => tf.has(i + 1))) {
@@ -323,6 +361,9 @@ function recheckLinkText(p: PlanPayloadV2): PlanPayloadV2 {
     next.te = "rules";
     delete next.tm;
   }
+  // the AI pick's work line rides along only with AI-tailored tasks, so a
+  // templated plan never shows one AI-tagged week
+  if (next.w && next.e !== "rules" && (next.te === undefined || next.te === "rules")) delete next.w;
   return next;
 }
 
@@ -514,7 +555,7 @@ export function tailoringFields(t: CreatePlanArgs["tailoring"]): Pick<PlanPayloa
   const anyTask = t.tailored.some(Boolean);
   const tf = t.tailored.map((ok, i) => (ok ? 0 : i + 1)).filter((k) => k > 0);
   const te = anyTask || t.artifactTailored ? t.engine : "rules";
-  const tm = te === "ai" && t.model && /^[A-Za-z0-9._-]{1,40}$/.test(t.model) ? t.model : undefined;
+  const tm = te === "ai" && t.model && MODEL_ID_RE.test(t.model) ? t.model : undefined;
   return {
     ...(anyTask ? { tw: t.tasks.slice(0, MAX_WEEKS_STORED).map((x) => x.slice(0, TASK_CHARS)) } : {}),
     ...(t.artifactTailored ? { ta: t.artifact.slice(0, ARTIFACT_CHARS) } : {}),

@@ -794,6 +794,8 @@ export default function Compare() {
   }
 
   if (cols.length < 2) {
+    // still offer the message to someone who took the pick
+    const pickOnly = courseById(decision.pickId) ?? null;
     return (
       <Shell>
         <section>
@@ -811,6 +813,14 @@ export default function Compare() {
               </div>
             </Card>
           </Reveal>
+          {pickOnly && (
+            <AskSomeone
+              className="mt-6 max-w-2xl"
+              courses={[{ id: pickOnly.id, title: pickOnly.title }]}
+              role={profile.currentRole}
+              hoursPerWeek={profile.hoursPerWeek}
+            />
+          )}
         </section>
       </Shell>
     );

@@ -5,7 +5,8 @@ import { rulesAloneLine } from "@/lib/templates";
 
 // "Rules alone would have picked {title}. {vsRules}" when the AI chose
 // differently from the keyword ranking, or the "same course" line when they
-// agree. Nothing on the rules path, after a swap or after a chip.
+// agree. Nothing on the rules path or after a swap; the pick page also leaves
+// it out after a chip that changed the list the AI chose from.
 
 export function RulesVsAi({
   decision,

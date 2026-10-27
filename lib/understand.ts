@@ -301,6 +301,8 @@ const NOT_STUDY_AFTER =
   /^\s*(?:(?:a|per|each|every)\s+(?:day|night|shift)|daily|each\s+way|(?:of|on|in)\s+(?:my\s+)?(?:commute|commuting|meetings?|calls?)|at\s+(?:work|the\s+office)|(?:a|per)\s+(?:month|year))\b/i;
 /** Just before the figure: they are offering it ("I can study", "I have", "spare"). */
 const STUDY_BEFORE = /\b(?:study|learn(?:ing)?|spare|free|give|put in|set aside|have|got|manage|can do|for this|for courses?)\b[^.]{0,25}$/i;
+/** Just before the figure: it is time at work ("I work 45 hours", "working 40 hours", "full-time, 40 hours"). */
+const WORK_BEFORE = /\b(?:work(?:s|ing)?|job|shifts?|office|full[- ]time|part[- ]time)\b[^.]{0,20}$/i;
 
 function numberValue(raw: string): number {
   const w = raw.toLowerCase();
@@ -309,9 +311,10 @@ function numberValue(raw: string): number {
 
 /**
  * Hours a week written in the text, or null. Every "N hours" is read with
- * the words around it: a weekly figure wins, then one offered for study ("I
- * can study two hours"), then a lone bare figure. Per day, each way, at work
- * and per month figures never count ("9 hours a day in Excel").
+ * the words around it: a figure offered for study ("I can study two hours a
+ * week") wins, then any other weekly figure, then a lone bare figure. Per
+ * day, each way, at work and per month figures never count ("9 hours a day in
+ * Excel"), and neither do working hours ("I work 45 hours a week").
  */
 export function hoursFromText(text: string): number | null {
   let weekly: number | null = null;
@@ -325,17 +328,23 @@ export function hoursFromText(text: string): number | null {
     const after = text.slice(end, end + 30);
     const before = text.slice(Math.max(0, at - 40), at);
     if (NOT_STUDY_AFTER.test(after)) continue;
+    // The nearer context wins: in "I have a full-time job, 40 hours a week"
+    // the work words sit closer to 40 than "have", so it is work time.
+    const studyAt = before.search(STUDY_BEFORE);
+    const workAt = before.search(WORK_BEFORE);
+    const offered = studyAt >= 0 && studyAt > workAt;
+    if (!offered && workAt >= 0) continue;
+    if (offered) {
+      study ??= n;
+      continue;
+    }
     if (WEEKLY_AFTER.test(after)) {
       weekly ??= n;
       continue;
     }
-    if (STUDY_BEFORE.test(before)) {
-      study ??= n;
-      continue;
-    }
     bare.push(n);
   }
-  return weekly ?? study ?? (bare.length === 1 ? bare[0] : null);
+  return study ?? weekly ?? (bare.length === 1 ? bare[0] : null);
 }
 
 /**

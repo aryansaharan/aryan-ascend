@@ -93,18 +93,29 @@ export function SituationInput({
 
   function startPrompt(prompt: string) {
     if (hasPrompt(value, prompt)) {
-      // already started: put the caret at the end of that line
+      // already started: put the caret at the end of that line, after a space
       const lines = value.split("\n");
       let at = 0;
-      for (const l of lines) {
-        at += l.length;
-        if (l.trim().toLowerCase().startsWith(`${prompt.toLowerCase()}:`)) break;
+      let i = 0;
+      for (; i < lines.length; i++) {
+        at += lines[i].length;
+        if (lines[i].trim().toLowerCase().startsWith(`${prompt.toLowerCase()}:`)) break;
         at += 1;
+      }
+      if (i < lines.length && lines[i].endsWith(":")) {
+        lines[i] = `${lines[i]} `;
+        const next = lines.join("\n").slice(0, LIMITS.situationMax);
+        onChange(next);
+        placeCaret(Math.min(at + 1, next.length));
+        return;
       }
       placeCaret(at);
       return;
     }
-    const base = value.replace(/[ \t]+$/, "");
+    // a prompt line nobody has written on yet keeps its space, so the caret
+    // lands after "Label: " when they come back to it
+    const last = value.split("\n").pop() ?? "";
+    const base = EMPTY_PROMPT_LINE.test(last) ? value : value.replace(/[ \t]+$/, "");
     const sep = base.length === 0 || base.endsWith("\n") ? "" : "\n";
     const next = `${base}${sep}${prompt}: `.slice(0, LIMITS.situationMax);
     onChange(next);

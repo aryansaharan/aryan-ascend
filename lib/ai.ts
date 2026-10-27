@@ -35,8 +35,12 @@ function anthropic(): Anthropic {
 // support it.
 const SUPPORTS_FALLBACK = !/haiku/.test(MODEL);
 
-/** What every route's verifier reads: "stop" means a complete answer that parsed. */
-export type ModelAnswer = { finishReason: string | undefined; output: unknown; raw: unknown };
+/**
+ * What every route's verifier reads: "stop" means a complete answer that
+ * parsed. `model` is the model that actually wrote the answer: the requested
+ * one, or the fallback model when the server-side fallback served the turn.
+ */
+export type ModelAnswer = { finishReason: string | undefined; output: unknown; raw: unknown; model?: string };
 
 function finishReasonOf(stop: string | null | undefined): string | undefined {
   if (stop === "end_turn") return "stop";
@@ -84,19 +88,34 @@ export async function structuredCall<S extends z.ZodType>({
     },
     { timeout: timeoutMs, maxRetries: 0 },
   );
+  // When the requested model declines and a fallback model takes over, a
+  // "fallback" block marks the hand-over: only the text after the last one is
+  // the answer, and the model named on the page is the one that wrote it.
+  let after = 0;
+  let fallbackTo: string | undefined;
+  res.content.forEach((b, i) => {
+    if (b.type === "fallback") {
+      after = i + 1;
+      fallbackTo = b.to?.model;
+    }
+  });
+  const servedBy =
+    res.usage?.iterations?.find((it) => it.type === "fallback_message")?.model ?? fallbackTo ?? res.model ?? MODEL;
+  const model = typeof servedBy === "string" && servedBy ? servedBy : MODEL;
   const text = res.content
+    .slice(after)
     .map((b) => (b.type === "text" ? b.text : ""))
     .join("")
     .trim();
   const finish = finishReasonOf(res.stop_reason);
   const raw = parseOrText(text);
-  if (finish !== "stop") return { finishReason: finish, output: undefined, raw };
+  if (finish !== "stop") return { finishReason: finish, output: undefined, raw, model };
   // Constrained decoding makes the shape right; zod is the last check, and
   // anything it rejects is an invalid answer for the verifier, not an outage.
   const parsed = typeof raw === "object" && raw !== null ? schema.safeParse(raw) : null;
   return parsed?.success
-    ? { finishReason: "stop", output: parsed.data, raw }
-    : { finishReason: "invalid", output: undefined, raw };
+    ? { finishReason: "stop", output: parsed.data, raw, model }
+    : { finishReason: "invalid", output: undefined, raw, model };
 }
 
 // JSON schema ------------------------------------------------------------------

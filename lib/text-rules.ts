@@ -11,18 +11,21 @@ export const NUMBER_UNIT_SRC = [
   String.raw`\ban\s+hour\b`,
   // a share
   String.raw`\d\s*(?:%|percent\b)`,
-  // money: "₹499", "$49", "Rs 499", "INR 4,000", "100 rs"
+  // money: "₹499", "$49", "Rs 499", "INR 4,000", "100 rs", "49 dollars", "forty rupees"
   String.raw`[₹$€£]\s?\d|\b(?:rs\.?|inr|usd|eur|gbp)\s?\d|\d\s?(?:rs|inr|usd)\b`,
-  // ratings and counts: "rated 4.7", "4.8/5", "4 of your 5 gaps"
+  String.raw`(?:\d[\d,.]*|\b(?:${NUM_WORDS}))\s*(?:dollars?|rupees?|bucks)\b`,
+  // ratings and counts: "rated 4.7", "4.8/5", "a 4.8 rating", "120 reviews", "a 4.9 average", "4 of your 5 gaps", "3 of 5"
   String.raw`\brat(?:ed|ings?)\b[^.]{0,20}\d|\b\d+(?:\.\d+)?\s*(?:\/|out of)\s*\d|\b\d+\s+of\s+(?:your|the|its)\s+\d`,
+  String.raw`\b\d+(?:\.\d+)?\s*-?\s*(?:ratings?|reviews?|average)\b|\b\d+\s+of\s+\d+\b`,
 ].join("|");
 
 /**
  * A number the page should own: a time ("20 minutes", "a 6-week course",
- * "three weeks", "half an hour"), a price ("₹499", "Rs 499", "USD 49"), a share
- * ("50%"), a rating ("rated 4.7", "4.8 stars") or a count of gaps ("4 of your 5
- * gaps"). Bare years ("Updated in 2025") and phrases like "once a week" or
- * "three sentences" don't match.
+ * "three weeks", "half an hour"), a price ("₹499", "Rs 499", "USD 49", "49
+ * dollars"), a share ("50%"), a rating ("rated 4.7", "4.8 stars", "a 4.8
+ * rating", "120 reviews") or a count ("4 of your 5 gaps", "3 of 5"). Bare years
+ * ("Updated in 2025") and phrases like "once a week" or "three sentences"
+ * don't match.
  */
 export const NUMBER_UNIT_RE = new RegExp(NUMBER_UNIT_SRC, "i");
 

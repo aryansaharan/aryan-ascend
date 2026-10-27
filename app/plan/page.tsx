@@ -25,7 +25,7 @@ import { getTailoring, loadTailoring, localTailoring, type TailorArgs } from "@/
 import { backupSlot } from "@/lib/booking";
 import { courseById } from "@/lib/catalog";
 import type { Course } from "@/lib/course-types";
-import { getLatestDecision } from "@/lib/decision-store";
+import { getLatestDecision, setChosen } from "@/lib/decision-store";
 import { checkCourse, costAtPaceFor, fit, planN } from "@/lib/fit";
 import { checkedLabel, costLine, durationPhrase, modelLabel, paceLine, weeksPhrase, type CostAtPace } from "@/lib/format";
 import { useDisplayCurrency } from "@/lib/hooks";
@@ -66,6 +66,7 @@ import {
   planOpener,
   tailorEngineLine,
   taskTag,
+  weekTaskTag,
 } from "@/lib/templates";
 
 // /plan (spec 3.5, 6.2 to 6.6, addendum-ai Job 4). States, in order:
@@ -74,7 +75,8 @@ import {
 //   2. a legacy ?d= link: converted with no AI, written back as #p=.
 //   3. a chosen course without a plan yet: the booking setup. "Make my plan"
 //      waits for the tailored weeks (POST /api/tailor, started as soon as the
-//      setup shows), then writes the plan into the link and saves it.
+//      setup shows, once per course and saved on the device), then writes the
+//      plan into the link and saves it.
 //   4. the latest saved plan.
 //   5. nothing yet.
 // Opening a plan never calls the AI: the weeks are rebuilt from the catalog
@@ -82,6 +84,9 @@ import {
 
 /** At most this long on "Tailoring each week to your job" before templates take over. */
 const TAILOR_WAIT_MS = 30_000;
+
+/** The promise: a first session within 48 hours of choosing the course. */
+const CHOICE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 type BookingView = {
   kind: "booking";
@@ -360,6 +365,18 @@ export default function PlanPage() {
     const pending = tailorRef.current ?? loadTailoring(args).then((r) => r.response);
     const tailoring = (await withTimeout(pending, TAILOR_WAIT_MS)) ?? localTailoring(v.course, args);
     const { profile, decision, course } = v;
+    // The booking window runs 48 hours from now. Someone who chose days ago
+    // and comes back to book is choosing again, so the plan's "chosen at"
+    // moves to now and the first session stays within 48 hours of it.
+    const chosenAt = decision.commitAt ? new Date(decision.commitAt) : new Date();
+    const commitAt =
+      Number.isNaN(chosenAt.getTime()) || choice.s.getTime() - chosenAt.getTime() > CHOICE_WINDOW_MS
+        ? new Date()
+        : chosenAt;
+    if (!decision.commitAt || commitAt !== chosenAt) {
+      // the decision and the plan must agree, so a reload finds this plan
+      setChosen(decision, decision.chosenId ?? course.id, commitAt.toISOString());
+    }
     const plan = createPlan({
       course,
       n: v.n,
@@ -367,11 +384,13 @@ export default function PlanPage() {
       m: profile.move,
       b: profile.baseline,
       role: profile.currentRole,
-      commitAt: decision.commitAt ?? new Date(),
+      commitAt,
       s: choice.s,
       o: choice.o,
       k: choice.k,
-      w: v.kept ? decision.useItAtWork : undefined,
+      // the pick's own work line fills week 1 only when the AI tailored the plan;
+      // a templated plan stays all templates, so every label on it agrees
+      w: v.kept && tailoring.engine !== "rules" ? decision.useItAtWork : undefined,
       e: v.kept ? decision.engine : "rules",
       tailoring,
       skim: v.kept ? skimInScope(v) : undefined,
@@ -797,7 +816,8 @@ function HowMade({
   }, [te, made, plan]);
 
   const W = built.weekCount;
-  const tailoredCount = built.weeks.filter((w) => w.tailored).length;
+  // every week tagged AI, including a week 1 filled by the pick's own work line
+  const tailoredCount = built.weeks.filter((w) => weekTaskTag({ e: plan.e, te }, w) !== "TEMPLATE").length;
   const modules = built.whole
     ? "the whole course outline"
     : built.n === 1
@@ -805,7 +825,7 @@ function HowMade({
       : `the first ${built.n} modules of the course outline`;
   const tasks =
     te === "ai"
-      ? `${tailoredCount} of ${W} weekly tasks were written for your job by ${modelLabel(tailoring?.model ?? plan.tm)}, once, when you made this plan. Code checked each one: no numbers, no dashes, and no module from another week.`
+      ? `${tailoredCount} of ${W} weekly tasks were written for your job by ${modelLabel(tailoring?.model ?? plan.tm)}, once, and travel in this link. Code checked each one: no stated times or prices, no dashes, and no module from another week.`
       : te === "mock"
         ? `${tailoredCount} of ${W} weekly tasks were written by ${MOCK_LABEL} from keyword heuristics, then checked by code the same way a real answer is.`
         : `Ascend's templates for ${MOVES[plan.m].label}. No AI wrote these.${tailoring?.reason === "too-many-weeks" ? " Plans this long use templates." : tailoring?.reason === "no-key" ? " AI isn't set up here." : ""}`;

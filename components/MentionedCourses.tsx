@@ -5,7 +5,7 @@ import { HoursCalculator } from "@/components/CheckAnother";
 import { Card, EngineLine, SectionLabel, easeOut } from "@/components/ui";
 import { courseById } from "@/lib/catalog";
 import { checkCourse } from "@/lib/fit";
-import { costLine, paceLine, type DisplayCurrency } from "@/lib/format";
+import { checkedLabel, costLine, paceLine, type DisplayCurrency } from "@/lib/format";
 import { isAiEngine, type Decision, type Verdict } from "@/lib/pick-types";
 import type { MentionStatus, ProfileV2 } from "@/lib/profile";
 import { NOT_IN_LIST_NOTE, NO_VERDICT_NOTE, VERDICT_LABELS, engineName } from "@/lib/templates";
@@ -100,9 +100,12 @@ export function MentionedCourses({
                         {check.scope && !check.scope.whole && check.scopeLabel ? ` for ${check.scopeLabel}` : ""}
                         {" · "}
                         {costLine(course, check.costAtPace, currency)}
+                        {` · ${checkedLabel(course)}`}
                       </p>
                     ) : (
-                      <p className="text-[13px] leading-relaxed text-muted">{check.text}</p>
+                      <p className="text-[13px] leading-relaxed text-muted">
+                        {check.text} <span className="text-muted-2">{checkedLabel(course)}.</span>
+                      </p>
                     )}
                     {!verdict && !isPick && <p className="mt-1.5 text-[12.5px] text-muted-2">{NO_VERDICT_NOTE}</p>}
                   </div>

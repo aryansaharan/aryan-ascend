@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-10-26T07:11:38.963Z",
+  "ranAt": "2026-10-27T06:04:01.765Z",
   "catalogVersion": "2026-10-20",
   "catalogEntries": 69,
   "shippedMoves": [
@@ -12,7 +12,7 @@
     "growth",
     "cloud"
   ],
-  "total": 2875,
+  "total": 2906,
   "failed": 0,
   "passRate": 1,
   "sections": {
@@ -25,12 +25,12 @@
       "fail": 0
     },
     "unit": {
-      "pass": 423,
+      "pass": 454,
       "fail": 0
     }
   },
   "failures": [],
-  "ai": "skipped (AI_API_KEY not set)",
+  "ai": "skipped (ANTHROPIC_API_KEY not set)",
   "personas": [
     {
       "id": "hr-generalist",

@@ -191,8 +191,10 @@ export async function understandSituation(
     const answer = await callModel(text, input, moves, mode);
     const ms = Date.now() - started;
     const v = verifyUnderstanding({ finishReason: answer.finishReason, output: answer.output, situation: text, moves });
+    // the model that wrote the answer (a fallback model, if one served the turn)
+    const answeredBy = answer.model ?? modelName;
     if (!v.ok) {
-      return rulesUnderstandResponse(text, "ai-invalid", { checks: v.checks, ms, model: modelName, raw: answer.raw, sent });
+      return rulesUnderstandResponse(text, "ai-invalid", { checks: v.checks, ms, model: answeredBy, raw: answer.raw, sent });
     }
     const response: UnderstandResponse = {
       engine,
@@ -200,7 +202,7 @@ export async function understandSituation(
       checks: v.checks,
       words: countWords(text),
       ms,
-      model: modelName,
+      model: answeredBy,
       ...(answer.raw !== undefined ? { raw: answer.raw } : {}),
       sent,
     };

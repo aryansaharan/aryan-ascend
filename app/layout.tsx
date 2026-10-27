@@ -73,7 +73,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${SITE_NAME}: ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
-    creator: "@aryansaharan",
+    // no creator handle: none is confirmed as Aryan's (his public profile is LinkedIn)
   },
   alternates: {
     canonical: "/",

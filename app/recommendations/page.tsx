@@ -13,7 +13,8 @@ import { MentionedCourses } from "@/components/MentionedCourses";
 import { PickCard } from "@/components/PickCard";
 import { RepickNote, type RepickStatus } from "@/components/RepickNote";
 import { RulesVsAi } from "@/components/RulesVsAi";
-import { WorkLedger } from "@/components/WorkLedger";
+import { WorkLedger, aiSawThese, ledgerStages } from "@/components/WorkLedger";
+import { AskSomeone } from "@/components/AskSomeone";
 import { matchFor } from "@/lib/skills";
 import {
   BlinkCaret,
@@ -214,6 +215,7 @@ export default function YourPick() {
     [profile, adjust, currency],
   );
   const stages = useMemo(() => (result && profile ? funnelStages(result, profile) : []), [result, profile]);
+  const candidateIds = useMemo(() => result?.candidates.map((c) => c.id) ?? [], [result]);
   const understanding = useMemo(
     () => (profile && ready ? getUnderstanding(profile.situation) : null),
     [profile, ready],
@@ -310,7 +312,8 @@ export default function YourPick() {
     return course ? [{ alt, course, candidate: candidateFor(alt.id), coverage: coverageFor(alt.id) }] : [];
   });
   const adjustedNote = decision && profile ? adjustedChipNames(profile, decision.adjust) : "";
-  const canReset = Boolean(adjustedNote) || (decision?.exclude.length ?? 0) > 0;
+  // a swap counts too: Reset brings back the first decision (the AI's, when it ran)
+  const canReset = Boolean(adjustedNote) || (decision?.exclude.length ?? 0) > 0 || decision?.origin === "swapped";
   // courses an earlier change keeps out that no pressed chip explains (a re-pick's, say)
   const hidden = (decision?.exclude ?? [])
     .filter((id) => id !== decision?.levelExclude)
@@ -393,6 +396,7 @@ export default function YourPick() {
               funnelKey={session?.loadId ?? 0}
               className="mt-4"
               stages={stages}
+              candidateIds={candidateIds}
               decision={decision}
               understoodBy={profile.understoodBy}
               aiGapIds={aiGapIds}
@@ -457,12 +461,24 @@ export default function YourPick() {
                   />
                 </div>
 
-                <Reveal delay={0.15}>
-                  <RulesVsAi className="mt-5" decision={decision} rulesTitle={rulesTitle} />
-                </Reveal>
+                {/* the comparison is about the list the AI chose from; a chip that changed that list hides it */}
+                {aiSawThese(decision, candidateIds) && (
+                  <Reveal delay={0.15}>
+                    <RulesVsAi className="mt-5" decision={decision} rulesTitle={rulesTitle} />
+                  </Reveal>
+                )}
 
                 <Reveal delay={0.25} className="mt-14 sm:mt-16 flex flex-col gap-14 sm:gap-16">
                   <MentionedCourses profile={profile} decision={decision} currency={currency} />
+
+                  {/* with no alternates there is no compare page, so the message to a past learner sits here */}
+                  {altRows.length === 0 && (
+                    <AskSomeone
+                      courses={[{ id: pickCourse.id, title: pickCourse.title }]}
+                      role={profile.currentRole}
+                      hoursPerWeek={profile.hoursPerWeek}
+                    />
+                  )}
 
                   <Alternates
                     rows={altRows}
@@ -507,7 +523,7 @@ export default function YourPick() {
                   <DecisionPanel
                     profile={profile}
                     decision={decision}
-                    stages={stages}
+                    stages={ledgerStages(stages, decision, candidateIds)}
                     ruledOut={result.ruledOut}
                     leftOutShown={leftOut.length}
                     understanding={understanding}
