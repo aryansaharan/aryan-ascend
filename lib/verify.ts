@@ -1,10 +1,13 @@
 import type { Candidate } from "./fit";
+import { courseById } from "./catalog";
 import {
   candidateCoverage,
   labelAlternates,
+  mentionMatchesCourse,
   pickAlternates,
   pickResponseOf,
   totalModulesMapped,
+  usefulAlternates,
 } from "./decide-rules";
 import type { Mention } from "./profile";
 import {
@@ -455,6 +458,7 @@ export function checkQuotes(
 /** Template reasons for verdicts code had to correct. */
 export const VERDICT_TEMPLATES = {
   pick: "This is the course Ascend picked for you.",
+  samePick: "Your pick is a course on this, so start there.",
   laterOnList: "It fits your answers. Start with the pick, then decide on this one.",
   later: "Worth a look after the pick.",
 } as const;
@@ -786,10 +790,14 @@ export function verify(input: VerifyInput): VerifyResult {
         reason = q.text;
       }
     }
-    const isPick = m.courseId !== null && m.courseId === pick.id;
+    // a vaguely named mention of the same subject ("a pandas course" when the
+    // pick is Pandas) is the pick too, unless the AI judged it off-direction
+    const samePick =
+      m.courseId === null && verdict !== "different-direction" && mentionMatchesCourse(m.text, courseById(pick.id));
+    const isPick = (m.courseId !== null && m.courseId === pick.id) || samePick;
     if (isPick && verdict !== "start-here") {
       verdict = "start-here";
-      reason = VERDICT_TEMPLATES.pick;
+      reason = samePick ? VERDICT_TEMPLATES.samePick : VERDICT_TEMPLATES.pick;
       verdictFixes++;
     } else if (!isPick && verdict === "start-here") {
       verdict = "later";
@@ -815,11 +823,18 @@ export function verify(input: VerifyInput): VerifyResult {
   }
   check(checks, "first gap", [firstGapFixed ? "Removed a sentence that called a later gap your first." : ""]);
 
+  // an alternate has to close at least one of their gaps (refilled from ones that do, never padded)
+  const finalAlternates = usefulAlternates(pick, alternates, input.candidates, coverage, nGaps);
+  const droppedUseless = alternates.filter((a) => !finalAlternates.some((f) => f.id === a.id)).length;
+  check(checks, "useful alternates", [
+    droppedUseless ? `Replaced ${plural(droppedUseless, "alternate")} that closes none of your gaps.` : "",
+  ]);
+
   return {
     decision: {
       engine: input.engine ?? "ai",
       pickId: pick.id,
-      alternates,
+      alternates: finalAlternates,
       whyThisOne: text.whyThisOne.trim(),
       useItAtWork: text.useItAtWork.trim(),
       honestFit: out.honestFit,

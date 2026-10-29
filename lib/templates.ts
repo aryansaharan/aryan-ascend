@@ -249,6 +249,7 @@ const CHECK_LABELS: Record<"understand" | "pick" | "tailor", Record<string, stri
     vsRules: "A comparison only when the pick differs from the rules",
     skim: "Skim notes point at real modules of the pick",
     verdicts: "One verdict per course you mentioned, consistent with the pick",
+    "useful alternates": "Every alternate closes at least one of your gaps",
   },
   tailor: {
     complete: "The answer was complete and in the expected format",

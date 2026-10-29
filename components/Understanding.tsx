@@ -400,7 +400,7 @@ function RoleRow({
     <Row
       label="Your role"
       action={
-        <TextLink onClick={editing ? done : () => setEditing(true)}>{editing ? "Done" : "Edit"}</TextLink>
+        <TextLink onClick={editing ? done : () => setEditing(true)} className="min-w-10 justify-end">{editing ? "Done" : "Edit"}</TextLink>
       }
     >
       {editing ? (
