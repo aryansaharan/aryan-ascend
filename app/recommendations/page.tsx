@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { AdjustChips } from "@/components/AdjustChips";
@@ -51,7 +50,7 @@ import {
   type Relaxation,
 } from "@/lib/fit";
 import { budgetPhrase, hoursAWeek } from "@/lib/format";
-import { useDisplayCurrency } from "@/lib/hooks";
+import { useDisplayCurrency, useReducedMotion } from "@/lib/hooks";
 import { trackMilestone } from "@/lib/metrics";
 import { MOVES } from "@/lib/moves";
 import { isAiEngine, type CandidateCoverage, type Decision } from "@/lib/pick-types";
@@ -118,7 +117,7 @@ export default function YourPick() {
   const router = useRouter();
   const ready = useSyncExternalStore(noopSubscribe, onClient, onServer);
   const currency = useDisplayCurrency();
-  const reduced = useReducedMotion() ?? false;
+  const reduced = useReducedMotion();
 
   // Where the page starts, read once in the browser.
   const start = useMemo<Start | null>(() => {

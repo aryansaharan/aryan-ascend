@@ -1,9 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { HoursCalculator } from "@/components/CheckAnother";
-import { Card, EngineLine, SectionLabel, easeOut } from "@/components/ui";
+import { Card, EngineLine, SectionLabel } from "@/components/ui";
 import { courseById } from "@/lib/catalog";
+import { fadeUp } from "@/lib/motion";
 import { checkCourse } from "@/lib/fit";
 import { checkedLabel, costLine, paceLine, type DisplayCurrency } from "@/lib/format";
 import { isAiEngine, type Decision, type Verdict } from "@/lib/pick-types";
@@ -61,11 +61,10 @@ export function MentionedCourses({
           const isPick = course !== undefined && course.id === decision.pickId;
           const check = course ? checkCourse(profile, decision.adjust, course, { currency }) : null;
           return (
-            <motion.div
+            <div
               key={`${m.text}-${i}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.05 * i, ease: easeOut }}
+              style={fadeUp(10, 0.45, 0.05 * i)}
+              className="fade-up"
             >
               <Card padded={false} className="p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -118,7 +117,7 @@ export function MentionedCourses({
                   </div>
                 )}
               </Card>
-            </motion.div>
+            </div>
           );
         })}
       </div>

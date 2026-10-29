@@ -3,7 +3,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, ExternalLink } from "lucide-react";
 import { AskSomeone } from "@/components/AskSomeone";
 import {
@@ -16,7 +15,6 @@ import {
   SectionLabel,
   SkeletonLine,
   TextLink,
-  easeOut,
 } from "@/components/ui";
 import { CATALOG_VERSION, courseById } from "@/lib/catalog";
 import { totalHours, type CertificateKind, type Course, type Currency } from "@/lib/course-types";
@@ -37,6 +35,7 @@ import {
   type DisplayCurrency,
 } from "@/lib/format";
 import { USD_INR } from "@/lib/fx";
+import { fadeUp } from "@/lib/motion";
 import { useDisplayCurrency } from "@/lib/hooks";
 import type { CandidateCoverage, CoverageSource, Decision } from "@/lib/pick-types";
 import type { ProfileV2 } from "@/lib/profile";
@@ -479,7 +478,6 @@ function CompareTable({
   dotLegend: string | null;
   onChoose: (id: string) => void;
 }) {
-  const reduced = useReducedMotion();
   const rows: DeskRow[] = [
     { kind: "head" },
     ...(gaps.length > 0
@@ -616,12 +614,10 @@ function CompareTable({
         ))}
       </div>
       {cols.map((col, i) => (
-        <motion.div
+        <div
           key={col.course.id}
-          initial={reduced ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: easeOut }}
-          className={`row-span-full grid grid-rows-subgrid min-w-0 rounded-2xl bg-card border ${
+          style={fadeUp(14, 0.5, 0.1 + i * 0.08)}
+          className={`fade-up row-span-full grid grid-rows-subgrid min-w-0 rounded-2xl bg-card border ${
             col.isPick
               ? "border-foreground shadow-[0_10px_30px_-18px_rgba(10,10,10,0.35)]"
               : "border-border-soft card-elev"
@@ -632,7 +628,7 @@ function CompareTable({
               {columnCell(row, col, i)}
             </div>
           ))}
-        </motion.div>
+        </div>
       ))}
     </div>
   );
@@ -653,16 +649,13 @@ function CompareCards({
   model?: string;
   onChoose: (id: string) => void;
 }) {
-  const reduced = useReducedMotion();
   return (
     <div className="lg:hidden flex flex-col gap-3">
       {cols.map((col, i) => (
-        <motion.article
+        <article
           key={col.course.id}
-          initial={reduced ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: easeOut }}
-          className={`rounded-2xl bg-card border ${
+          style={fadeUp(14, 0.5, 0.1 + i * 0.08)}
+          className={`fade-up rounded-2xl bg-card border ${
             col.isPick
               ? "border-foreground shadow-[0_10px_30px_-18px_rgba(10,10,10,0.35)]"
               : "border-border-soft card-elev"
@@ -721,7 +714,7 @@ function CompareCards({
           <div className="px-5 pt-4 pb-5 border-t border-border-soft">
             <ChooseButton col={col} onChoose={onChoose} />
           </div>
-        </motion.article>
+        </article>
       ))}
     </div>
   );
@@ -863,25 +856,21 @@ export default function Compare() {
         <Reveal>
           <SectionStrip />
         </Reveal>
-        <motion.h1
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.05, ease: easeOut }}
-          className="mt-5 text-[2rem] sm:text-[2.5rem] lg:text-[2.75rem] leading-[1.05] tracking-[-0.02em] font-semibold text-foreground"
+        <h1
+          style={fadeUp(12, 0.6, 0.05)}
+          className="fade-up mt-5 text-[2rem] sm:text-[2.5rem] lg:text-[2.75rem] leading-[1.05] tracking-[-0.02em] font-semibold text-foreground"
         >
           {COUNT_WORDS[cols.length]} that fit.{" "}
           <span className="serif-italic font-normal text-foreground/85">One to start.</span>
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.12, ease: easeOut }}
-          className="mt-3 text-[15px] sm:text-base leading-relaxed text-muted max-w-[58ch]"
+        </h1>
+        <p
+          style={fadeUp(10, 0.6, 0.12)}
+          className="fade-up mt-3 text-[15px] sm:text-base leading-relaxed text-muted max-w-[58ch]"
         >
           Same facts, same rows.{" "}
           <span className="hidden lg:inline">The outlined column is your pick.</span>
           <span className="lg:hidden">The outlined card is your pick.</span>
-        </motion.p>
+        </p>
         <Reveal delay={0.18}>
           <EngineLine className="mt-4">{engineLine(d)}</EngineLine>
         </Reveal>

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { ArrowLeft, Check, ChevronDown, Info, Link2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import {
@@ -14,7 +13,6 @@ import {
   SectionLabel,
   SkeletonLine,
   TextLink,
-  easeOut,
 } from "@/components/ui";
 import { BookingSheet, type BookingChoice } from "@/components/BookingSheet";
 import { FirstSessionCard, downloadPlanIcs } from "@/components/FirstSessionCard";
@@ -32,6 +30,7 @@ import { useDisplayCurrency } from "@/lib/hooks";
 import { decodeLegacyPlan, legacyToV2 } from "@/lib/legacy";
 import { trackMilestone } from "@/lib/metrics";
 import { MOVES } from "@/lib/moves";
+import { fadeUp } from "@/lib/motion";
 import type { Decision, Engine } from "@/lib/pick-types";
 import { buildWeeks, currentWeek, nextMondayISO, type BuildArgs, type PlanWeek } from "@/lib/plan-build";
 import {
@@ -508,11 +507,9 @@ function LoadingState() {
 
 function Notice({ title, body, children }: { title: string; body: string; children: React.ReactNode }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: easeOut }}
-      className="mt-10"
+    <section
+      style={fadeUp(10, 0.5)}
+      className="fade-up mt-10"
     >
       <Eyebrow variant="section" rule>
         04 Your plan
@@ -522,7 +519,7 @@ function Notice({ title, body, children }: { title: string; body: string; childr
         <p className="mt-2 text-[14.5px] leading-relaxed text-muted max-w-[52ch]">{body}</p>
         <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">{children}</div>
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -549,11 +546,9 @@ function BookingScreen({
     checkedLabel(course, now),
   ];
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: easeOut }}
-      className="mt-6 pb-16"
+    <section
+      style={fadeUp(10, 0.5)}
+      className="fade-up mt-6 pb-16"
     >
       <Eyebrow variant="section" rule>
         04 Your first session
@@ -576,7 +571,7 @@ function BookingScreen({
           onSubmit={onSubmit}
         />
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -658,14 +653,12 @@ function PlanScreen({
         <Eyebrow variant="section" rule>
           04 Your plan
         </Eyebrow>
-        <motion.h1
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: easeOut }}
-          className="mt-5 text-[1.6rem] sm:text-[2rem] leading-[1.15] tracking-[-0.015em] font-semibold text-foreground"
+        <h1
+          style={fadeUp(12, 0.5)}
+          className="fade-up mt-5 text-[1.6rem] sm:text-[2rem] leading-[1.15] tracking-[-0.015em] font-semibold text-foreground"
         >
           {course.title}
-        </motion.h1>
+        </h1>
         <p className="mt-2 text-[13.5px] text-muted">{course.provider}</p>
         <div className="mt-3.5 flex flex-wrap gap-2">
           <FactChip>{paceLine(built.weekCount, plan.h)}</FactChip>

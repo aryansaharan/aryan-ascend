@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Check } from "lucide-react";
-import { SectionLabel, TextLink, easeOut } from "@/components/ui";
+import { SectionLabel, TextLink } from "@/components/ui";
 import type { Engine } from "@/lib/pick-types";
 import type { PlanWeek } from "@/lib/plan-build";
 import { durationPhrase, fmtDay } from "@/lib/format";
+import { fadeUp } from "@/lib/motion";
 import { weekTaskTag, type TaskTagText } from "@/lib/templates";
 
 // The weeks of a plan (spec 6.3, addendum-ai Job 4). Everything here comes
@@ -51,16 +51,15 @@ function WeekCheck({
   onToggle: () => void;
 }) {
   return (
-    <motion.button
+    <button
       type="button"
       role="checkbox"
       aria-checked={checked}
       aria-label={`Week ${k} done`}
       disabled={locked}
       onClick={onToggle}
-      whileTap={locked ? undefined : { scale: 0.92 }}
-      transition={{ type: "spring", stiffness: 500, damping: 20 }}
-      className="-mr-1.5 -mt-1.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full disabled:cursor-not-allowed"
+      style={{ "--tap": "0.92" } as React.CSSProperties}
+      className="squeeze -mr-1.5 -mt-1.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full disabled:cursor-not-allowed"
     >
       <span
         className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
@@ -73,7 +72,7 @@ function WeekCheck({
       >
         {checked && <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={2.5} />}
       </span>
-    </motion.button>
+    </button>
   );
 }
 
@@ -122,12 +121,10 @@ export function PlanWeeks({
           const isNow = currentK === w.k;
           const tag = weekTaskTag(engines, w);
           return (
-            <motion.li
+            <li
               key={w.k}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: Math.min(i, 6) * 0.04, ease: easeOut }}
-              className={`rounded-2xl border bg-card p-5 sm:p-6 card-elev ${
+              style={fadeUp(8, 0.4, Math.min(i, 6) * 0.04)}
+              className={`fade-up rounded-2xl border bg-card p-5 sm:p-6 card-elev ${
                 isNow ? "border-foreground/25" : "border-border-soft"
               }`}
             >
@@ -183,7 +180,7 @@ export function PlanWeeks({
                 </div>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-foreground">{w.task}</p>
               </div>
-            </motion.li>
+            </li>
           );
         })}
       </ol>

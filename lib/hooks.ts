@@ -13,3 +13,20 @@ const serverCurrency = (): DisplayCurrency => "USD";
 export function useDisplayCurrency(): DisplayCurrency {
   return useSyncExternalStore(noopSubscribe, displayCurrency, serverCurrency);
 }
+
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void): () => void {
+  const mq = window.matchMedia(REDUCED_MOTION);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+/** True when the system asks for reduced motion; false during prerender and hydration. */
+export function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia(REDUCED_MOTION).matches,
+    () => false,
+  );
+}

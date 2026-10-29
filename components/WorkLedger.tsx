@@ -1,11 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { Funnel } from "@/components/Funnel";
-import { BlinkCaret, easeOut } from "@/components/ui";
+import { BlinkCaret } from "@/components/ui";
 import type { FunnelStage } from "@/lib/fit";
 import { modelLabel } from "@/lib/format";
+import { fadeUp } from "@/lib/motion";
 import { isAiEngine, type Decision } from "@/lib/pick-types";
 import type { SkillId } from "@/lib/skills";
 import { MOCK_LABEL, engineLine, receiptLines } from "@/lib/templates";
@@ -112,7 +112,6 @@ export function WorkLedger({
   funnelKey: number;
   className?: string;
 }) {
-  const reduced = useReducedMotion();
   const lines = decision && !pending ? receiptLines(decision, understoodBy, aiGapIds ?? null) : [];
   const ai = decision ? isAiEngine(decision.engine) : false;
   const mock = decision?.engine === "mock";
@@ -185,25 +184,17 @@ export function WorkLedger({
           onDone={onDone}
         />
       </Row>
-      <motion.div
-        initial={false}
-        animate={{ opacity: aiRow ? 1 : 0 }}
-        transition={{ duration: reduced ? 0 : 0.35, ease: easeOut }}
-      >
+      <div style={{ opacity: aiRow ? 1 : 0, transition: "opacity 0.35s var(--ease-out)" }}>
         <Row label="AI">
           {aiRow}
         </Row>
-      </motion.div>
+      </div>
       {checksRow && (
-        <motion.div
-          initial={reduced ? false : { opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: reduced ? 0 : 0.15, ease: easeOut }}
-        >
+        <div style={fadeUp(4, 0.35, 0.15)} className="fade-up">
           <Row label="Checks" tag="code">
             {checksRow}
           </Row>
-        </motion.div>
+        </div>
       )}
     </section>
   );

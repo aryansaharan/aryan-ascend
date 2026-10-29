@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { CalendarPlus, Check } from "lucide-react";
-import { PrimaryButton, SecondaryButton, TextLink, easeOut } from "@/components/ui";
+import { Presence } from "@/components/Presence";
+import { PrimaryButton, SecondaryButton, TextLink } from "@/components/ui";
 import { SlotPicker, defaultSlotState, slotDate, slotPhrase, slotValid, type Slot } from "@/components/BookingSheet";
 import { fmtDay } from "@/lib/format";
+import { fadeUp, leave } from "@/lib/motion";
 import { missedWeek, type BuiltPlan } from "@/lib/plan-build";
 import { checkInDue, type PlanPayloadV2, type Progress } from "@/lib/plan-store";
 
@@ -21,11 +22,7 @@ type Done =
 
 function Shell({ children, tone = "plain" }: { children: React.ReactNode; tone?: "plain" | "done" }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.4, ease: easeOut }}
+    <section
       role="status"
       aria-live="polite"
       className={`rounded-2xl border p-5 sm:p-6 ${
@@ -33,7 +30,7 @@ function Shell({ children, tone = "plain" }: { children: React.ReactNode; tone?:
       }`}
     >
       {children}
-    </motion.section>
+    </section>
   );
 }
 
@@ -244,8 +241,15 @@ export function PlanBanners({
   }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {content && <motion.div key={key}>{content}</motion.div>}
-    </AnimatePresence>
+    // One banner at a time: the one on screen fades up and out, then the next fades in.
+    <Presence
+      id={content ? key : null}
+      enter="fade-up"
+      exit="fade-out"
+      initial={false}
+      style={{ ...fadeUp(8, 0.4), ...leave(-6, 0.4) }}
+    >
+      {content}
+    </Presence>
   );
 }

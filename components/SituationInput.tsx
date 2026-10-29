@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useSyncExternalStore } from "react";
-import { motion } from "framer-motion";
 import { Check, Lock, Plus } from "lucide-react";
 import { LIMITS } from "@/lib/profile";
+
+/** Press depth for the prompt chips (.tap in app/globals.css). */
+const TAP_94 = { "--tap": "0.94" } as React.CSSProperties;
 
 // Step 1 of /assess: the situation, in the person's own words. A textarea
 // with guide chips that start a prompt line, a quiet character count and the
@@ -164,14 +166,12 @@ export function SituationInput({
             const used = hasPrompt(value, p);
             const Icon = used ? Check : Plus;
             return (
-              <motion.button
+              <button
                 key={p}
                 type="button"
                 onClick={() => startPrompt(p)}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.94 }}
-                transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                className={`inline-flex items-center gap-1.5 min-h-10 rounded-full px-3 sm:px-3.5 py-2 text-sm border ${
+                style={TAP_94}
+                className={`tap inline-flex items-center gap-1.5 min-h-10 rounded-full px-3 sm:px-3.5 py-2 text-sm border ${
                   used
                     ? "bg-card text-muted border-border-soft"
                     : "bg-card text-foreground border-border hover:border-foreground/30"
@@ -179,7 +179,7 @@ export function SituationInput({
               >
                 <Icon aria-hidden className="w-3.5 h-3.5" />
                 {p}
-              </motion.button>
+              </button>
             );
           })}
         </div>

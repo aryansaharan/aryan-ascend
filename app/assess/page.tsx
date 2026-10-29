@@ -7,28 +7,24 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ComponentProps,
   type Dispatch,
   type ReactNode,
   type RefObject,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { Presence } from "@/components/Presence";
 import { BlinkCaret, EngineLine, TextLink } from "@/components/ui";
 import { SituationInput, cleanSituation } from "@/components/SituationInput";
-import {
-  OptionCard,
-  Understanding,
-  UnderstandingSkeleton,
-  checkStateFrom,
-  editsFrom,
-  missingFor,
-  type CheckState,
-} from "@/components/Understanding";
+import { OptionCard, UnderstandingSkeleton } from "@/components/CheckParts";
+import { checkStateFrom, editsFrom, missingFor, type CheckState } from "@/components/check-state";
+import type { Understanding as UnderstandingEditor } from "@/components/Understanding";
 import { loadUnderstanding, situationKey } from "@/lib/ai-client";
 import { EXAMPLES, exampleById, type ExampleProfile } from "@/lib/examples";
 import { budgetLabel, hoursChipLabel } from "@/lib/format";
 import { useDisplayCurrency } from "@/lib/hooks";
+import { fadeUp, leave } from "@/lib/motion";
 import { trackMilestone } from "@/lib/metrics";
 import { isAiEngine } from "@/lib/pick-types";
 import { storageWorks } from "@/lib/plan-store";
@@ -52,7 +48,40 @@ import {
 // gesture goes back one question, and a reload stays on the same step. Edits
 // on Check are kept for the tab in sessionStorage until "Looks right".
 
-const easeOut = [0.16, 1, 0.3, 1] as const;
+// The Check step's editor, with framer-motion's list animations, is a chunk
+// of its own, so the first load of /assess doesn't carry it (the effect in
+// Assess fetches it ahead of time). Not next/dynamic: a lazy component shows
+// its fallback for at least 300 ms once it suspends, even when the chunk is
+// already here, so the loaded component is kept in a small store instead.
+let CheckEditorLoaded: typeof UnderstandingEditor | null = null;
+const editorListeners = new Set<() => void>();
+/** Fetches the editor once; a failed fetch (offline) leaves the skeleton and is tried again next time. */
+function loadCheckEditor(): void {
+  if (CheckEditorLoaded) return;
+  import("@/components/Understanding")
+    .then((mod) => {
+      if (CheckEditorLoaded) return;
+      CheckEditorLoaded = mod.Understanding;
+      editorListeners.forEach((l) => l());
+    })
+    .catch(() => {});
+}
+function subscribeEditor(onChange: () => void): () => void {
+  editorListeners.add(onChange);
+  return () => editorListeners.delete(onChange);
+}
+
+/** The Check step's editor, or its skeleton until the chunk is in. */
+function CheckEditor(props: ComponentProps<typeof UnderstandingEditor>) {
+  const Editor = useSyncExternalStore(subscribeEditor, () => CheckEditorLoaded, () => null);
+  useEffect(() => {
+    loadCheckEditor();
+  }, []);
+  // Editor is the module's own export, set once and never replaced, so it
+  // can't remount the editor the way a component made during render would.
+  // eslint-disable-next-line react-hooks/static-components
+  return Editor ? <Editor {...props} /> : <UnderstandingSkeleton />;
+}
 
 const STEPS = ["Situation", "Time", "Budget", "Check"] as const;
 type StepIndex = 0 | 1 | 2 | 3;
@@ -359,7 +388,6 @@ function AssessGate() {
 function Assess({ flow, example, edit }: { flow: string; example: ExampleProfile | null; edit: boolean }) {
   const router = useRouter();
   const currency = useDisplayCurrency();
-  const reduced = useReducedMotion();
   const [s, dispatch] = useReducer(reducer, { example, edit, flow }, init);
   const [storageOk] = useState(() => storageWorks());
   const reqRef = useRef<Req | null>(null);
@@ -369,6 +397,13 @@ function Assess({ flow, example, edit }: { flow: string; example: ExampleProfile
   useEffect(() => {
     stateRef.current = s;
   });
+
+  // The Check step's editor is its own chunk. A page that opens past the
+  // first question (an example, "Edit answers", a reload) fetches it at once;
+  // otherwise leaving the first question does, two questions before Check.
+  useEffect(() => {
+    if (stateRef.current.step > 0) loadCheckEditor();
+  }, []);
 
   // Whenever a reading is pending (an example, "Edit answers", a reload past
   // step 1, Back or Forward), make sure its understand call is running. A
@@ -458,6 +493,7 @@ function Assess({ flow, example, edit }: { flow: string; example: ExampleProfile
     if (s.step === 0) {
       dispatch({ type: "leave-situation", text: cleaned });
       requestUnderstanding(reqRef, cleaned, dispatch);
+      loadCheckEditor();
       go(1);
     } else if (s.step === 1) {
       go(2);
@@ -533,11 +569,12 @@ function Assess({ flow, example, edit }: { flow: string; example: ExampleProfile
 
         {/* Progress bar */}
         <div className="h-1 bg-card-alt rounded-full overflow-hidden">
-          <motion.div
+          <div
             className="h-full bg-foreground"
-            initial={false}
-            animate={{ width: `${((s.step + 1) / STEPS.length) * 100}%` }}
-            transition={{ duration: 0.5, ease: easeOut }}
+            style={{
+              width: `${((s.step + 1) / STEPS.length) * 100}%`,
+              transition: "width 0.5s var(--ease-out)",
+            }}
           />
         </div>
 
@@ -561,152 +598,148 @@ function Assess({ flow, example, edit }: { flow: string; example: ExampleProfile
 
         {/* Question */}
         <section className={`flex-1 flex flex-col justify-start ${inExample ? "mt-8" : "mt-10"} pb-6`}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={s.step}
-              initial={{ opacity: 0, y: reduced ? 0 : 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: reduced ? 0 : -8 }}
-              transition={{ duration: 0.35, ease: easeOut }}
-            >
-              {s.step === 0 && (
-                <>
-                  <StepHead
-                    title="Where are you now, and where do you want to grow?"
-                    helper="A few sentences in your own words. What you do, where you want to be, what you've tried."
-                    why="Ascend's AI reads this for your direction, what you already have and the gaps to close. You'll check what it understood before anything is chosen."
+          {/* One step at a time: the old one fades up and out, then the next fades in. */}
+          <Presence
+            id={String(s.step)}
+            enter="fade-up"
+            exit="fade-out"
+            style={{ ...fadeUp(16, 0.35), ...leave(-8, 0.35) }}
+          >
+            {s.step === 0 && (
+              <>
+                <StepHead
+                  title="Where are you now, and where do you want to grow?"
+                  helper="A few sentences in your own words. What you do, where you want to be, what you've tried."
+                  why="Ascend's AI reads this for your direction, what you already have and the gaps to close. You'll check what it understood before anything is chosen."
+                />
+                <div className="mt-7">
+                  <SituationInput
+                    value={s.text}
+                    onChange={(text) => {
+                      dispatch({ type: "text", text });
+                      persist({ text });
+                    }}
+                    onSubmit={next}
+                    autoFocus={s.text.length === 0}
                   />
-                  <div className="mt-7">
-                    <SituationInput
-                      value={s.text}
-                      onChange={(text) => {
-                        dispatch({ type: "text", text });
-                        persist({ text });
+                </div>
+              </>
+            )}
+
+            {s.step === 1 && (
+              <>
+                <StepHead
+                  title="How many hours a week can you give this?"
+                  helper="Pick what survives a bad work week, not your best one."
+                  why="Ascend plans at 70% of this, because most weeks run short. That's its own rule of thumb, not a study."
+                />
+                <div className="mt-7 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {HOURS.map((h) => (
+                    <OptionCard
+                      key={h}
+                      selected={s.hours === h}
+                      onClick={() => {
+                        dispatch({ type: "hours", hours: h });
+                        persist({ hours: h });
                       }}
-                      onSubmit={next}
-                      autoFocus={s.text.length === 0}
+                      label={hoursChipLabel(h)}
                     />
-                  </div>
-                </>
-              )}
+                  ))}
+                </div>
+                {s.hoursFrom === "text" && s.hoursSaid !== null && (
+                  <p className="mt-4 text-[12.5px] leading-relaxed text-muted-2">
+                    Set from what you wrote: {s.hoursSaid} {s.hoursSaid === 1 ? "hour" : "hours"} a week.
+                    Change it if a bad week has less.
+                  </p>
+                )}
+              </>
+            )}
 
-              {s.step === 1 && (
-                <>
-                  <StepHead
-                    title="How many hours a week can you give this?"
-                    helper="Pick what survives a bad work week, not your best one."
-                    why="Ascend plans at 70% of this, because most weeks run short. That's its own rule of thumb, not a study."
-                  />
-                  <div className="mt-7 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {HOURS.map((h) => (
-                      <OptionCard
-                        key={h}
-                        selected={s.hours === h}
-                        onClick={() => {
-                          dispatch({ type: "hours", hours: h });
-                          persist({ hours: h });
+            {s.step === 2 && (
+              <>
+                <StepHead
+                  title="What can you spend on this?"
+                  helper="You'll see the real price and any free way to start either way."
+                  why="The cap covers every month at your pace for the part you'd start with. Code checks it before any AI runs."
+                />
+                <div className="mt-7 flex flex-col gap-2">
+                  {BUDGETS.map((b) => (
+                    <OptionCard
+                      key={b}
+                      selected={s.budget === b}
+                      onClick={() => {
+                        dispatch({ type: "budget", budget: b });
+                        persist({ budget: b });
+                      }}
+                      label={budgetLabel(b, currency)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {s.step === CHECK && (
+              <Presence
+                id={phase}
+                enter="fade-up"
+                exit="fade-out"
+                initial={false}
+                style={{ ...fadeUp(8, 0.3), ...leave(0, 0.3) }}
+              >
+                {phase === "loading" && (
+                  <>
+                    <StepHead
+                      title={
+                        <>
+                          {UNDERSTAND_LOADING}
+                          <BlinkCaret />
+                        </>
+                      }
+                      helper="Your direction, starting point, strengths and gaps, read from your words."
+                    />
+                    <div className="mt-7" aria-live="polite">
+                      <span className="sr-only">{UNDERSTAND_LOADING}</span>
+                      <UnderstandingSkeleton />
+                    </div>
+                  </>
+                )}
+
+                {phase !== "loading" && response && s.check && (
+                  <>
+                    <StepHead
+                      title={phase === "ai" ? "Here's what Ascend understood." : "Set your direction."}
+                      helper={
+                        phase === "ai"
+                          ? "Nothing is chosen until you say it looks right."
+                          : "A few quick choices. Ascend still uses what you wrote."
+                      }
+                      why={
+                        <EngineLine>
+                          {understandEngineLine({
+                            engine: response.engine,
+                            model: response.model,
+                            words: response.words,
+                            reason: response.reason,
+                          })}
+                        </EngineLine>
+                      }
+                    />
+                    <div className="mt-7">
+                      <CheckEditor
+                        response={response}
+                        state={s.check}
+                        onChange={(check) => {
+                          dispatch({ type: "check", check });
+                          // examples aren't saved until confirmed
+                          if (!example && s.und.status === "done") writeCheckEdits(s.und.text, check);
                         }}
-                        label={hoursChipLabel(h)}
                       />
-                    ))}
-                  </div>
-                  {s.hoursFrom === "text" && s.hoursSaid !== null && (
-                    <p className="mt-4 text-[12.5px] leading-relaxed text-muted-2">
-                      Set from what you wrote: {s.hoursSaid} {s.hoursSaid === 1 ? "hour" : "hours"} a week.
-                      Change it if a bad week has less.
-                    </p>
-                  )}
-                </>
-              )}
-
-              {s.step === 2 && (
-                <>
-                  <StepHead
-                    title="What can you spend on this?"
-                    helper="You'll see the real price and any free way to start either way."
-                    why="The cap covers every month at your pace for the part you'd start with. Code checks it before any AI runs."
-                  />
-                  <div className="mt-7 flex flex-col gap-2">
-                    {BUDGETS.map((b) => (
-                      <OptionCard
-                        key={b}
-                        selected={s.budget === b}
-                        onClick={() => {
-                          dispatch({ type: "budget", budget: b });
-                          persist({ budget: b });
-                        }}
-                        label={budgetLabel(b, currency)}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {s.step === CHECK && (
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={phase}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease: easeOut }}
-                  >
-                    {phase === "loading" && (
-                      <>
-                        <StepHead
-                          title={
-                            <>
-                              {UNDERSTAND_LOADING}
-                              <BlinkCaret />
-                            </>
-                          }
-                          helper="Your direction, starting point, strengths and gaps, read from your words."
-                        />
-                        <div className="mt-7" aria-live="polite">
-                          <span className="sr-only">{UNDERSTAND_LOADING}</span>
-                          <UnderstandingSkeleton />
-                        </div>
-                      </>
-                    )}
-
-                    {phase !== "loading" && response && s.check && (
-                      <>
-                        <StepHead
-                          title={phase === "ai" ? "Here's what Ascend understood." : "Set your direction."}
-                          helper={
-                            phase === "ai"
-                              ? "Nothing is chosen until you say it looks right."
-                              : "A few quick choices. Ascend still uses what you wrote."
-                          }
-                          why={
-                            <EngineLine>
-                              {understandEngineLine({
-                                engine: response.engine,
-                                model: response.model,
-                                words: response.words,
-                                reason: response.reason,
-                              })}
-                            </EngineLine>
-                          }
-                        />
-                        <div className="mt-7">
-                          <Understanding
-                            response={response}
-                            state={s.check}
-                            onChange={(check) => {
-                              dispatch({ type: "check", check });
-                              // examples aren't saved until confirmed
-                              if (!example && s.und.status === "done") writeCheckEdits(s.und.text, check);
-                            }}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-              )}
-            </motion.div>
-          </AnimatePresence>
+                    </div>
+                  </>
+                )}
+              </Presence>
+            )}
+          </Presence>
         </section>
 
         {/* Footer CTA */}

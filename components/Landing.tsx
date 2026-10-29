@@ -3,17 +3,12 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import {
-  motion,
-  useMotionValue,
-  useTransform,
-  animate,
-  useInView,
-  useReducedMotion,
-} from "framer-motion";
 import { ArrowRight, ChevronDown, Sparkles } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { ExampleAnswers } from "@/components/ExampleAnswers";
+import { InView, useInViewOnce } from "@/components/InView";
+import { useReducedMotion } from "@/lib/hooks";
+import { cubicBezier, fadeUp, reveal } from "@/lib/motion";
 import type { MoveId } from "@/lib/course-types";
 import { localGet } from "@/lib/local-store";
 import { clearSession } from "@/lib/session";
@@ -24,6 +19,9 @@ import { LATEST_PLAN_KEY } from "@/lib/storage-keys";
 // runtime: no lib/courses, lib/catalog, lib/moves, lib/skills, lib/templates,
 // lib/profile or lib/store (type imports are fine). app/page.tsx, a server
 // component, computes every catalog fact and passes it in as plain props.
+// It also ships no animation library: every fade, reveal and hover here is
+// CSS (app/globals.css), so the first visit downloads less and scrolling
+// runs no per-frame JavaScript.
 
 // The Continue card reads the saved plan through lib/plan-store, which pulls
 // in the catalog, so it loads only for visitors who have a plan.
@@ -32,7 +30,7 @@ const ContinueCard = dynamic(
   { ssr: false },
 );
 
-const easeOut = [0.16, 1, 0.3, 1] as const;
+const easeOut = cubicBezier(0.16, 1, 0.3, 1);
 
 const CONTACT_EMAIL = "aryansaharan30@gmail.com";
 const PROVIDERS_SHOWN = 12;
@@ -134,7 +132,6 @@ export default function Landing({
   modelName,
   runModelName,
 }: LandingProps) {
-  const reduced = useReducedMotion();
   const hasPlan = useHasSavedPlan();
   const examples = useMemo(() => jobExamples(), []);
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -145,10 +142,8 @@ export default function Landing({
 
   return (
     <main className="relative min-h-screen bg-background overflow-x-clip">
-      {/* Soft warm page-level glow */}
+      {/* Soft warm glow with the paper grain, fixed behind the page */}
       <div className="page-glow" aria-hidden />
-      {/* Subtle paper grain across the page */}
-      <div className="grain absolute inset-0 pointer-events-none" aria-hidden />
 
       <div className="relative w-full max-w-5xl mx-auto px-6 sm:px-10 lg:px-16 flex flex-col">
         {/* Top bar: motion.dev-inspired metadata strip */}
@@ -173,33 +168,27 @@ export default function Landing({
         {/* Hero: left-aligned to the container. Hero text constrains per-element, not via inner wrapper. */}
         <section className="relative pt-10 sm:pt-16 lg:pt-20 pb-12 sm:pb-16">
           <div className="relative flex flex-col items-start gap-7">
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: easeOut }}
-              className="mono-label inline-flex items-center gap-1.5 rounded-full bg-foreground text-accent-fg px-3 py-1 text-[10px] uppercase tracking-[0.22em]"
+            <div
+              style={fadeUp(6, 0.5)}
+              className="fade-up mono-label inline-flex items-center gap-1.5 rounded-full bg-foreground text-accent-fg px-3 py-1 text-[10px] uppercase tracking-[0.22em]"
             >
               <Sparkles className="w-3 h-3" />
               AI reads, code checks
-            </motion.div>
+            </div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.05, ease: easeOut }}
-              className="text-[2.25rem] sm:text-[3rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.02] tracking-[-0.025em] font-semibold text-foreground max-w-[20ch]"
+            <h1
+              style={fadeUp(14, 0.7, 0.05)}
+              className="fade-up text-[2.25rem] sm:text-[3rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.02] tracking-[-0.025em] font-semibold text-foreground max-w-[20ch]"
             >
               One course you can finish.{" "}
               <span className="serif-italic font-normal text-foreground/85">
                 First 25 minutes on your calendar, within 48 hours.
               </span>
-            </motion.h1>
+            </h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.15, ease: easeOut }}
-              className="text-[15px] sm:text-base lg:text-lg leading-relaxed text-muted max-w-[58ch]"
+            <p
+              style={fadeUp(12, 0.7, 0.15)}
+              className="fade-up text-[15px] sm:text-base lg:text-lg leading-relaxed text-muted max-w-[58ch]"
             >
               For people early in their career who know the direction they
               want to grow in. Describe where you are in your own words.
@@ -210,32 +199,20 @@ export default function Landing({
                 You get one pick, why it fits, and your first session on the
                 calendar.
               </span>
-            </motion.p>
+            </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.25, ease: easeOut }}
-              className="text-[11px] text-muted-2"
-            >
+            <div style={fadeUp(10, 0.7, 0.25)} className="fade-up text-[11px] text-muted-2">
               <span className="mono-label">
                 Built from a survey of early-career professionals (30+ responses) and 5 interviews.
               </span>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.32, ease: easeOut }}
-              className="w-full flex flex-col items-start gap-4 pt-2"
+            <div
+              style={fadeUp(10, 0.7, 0.32)}
+              className="fade-up w-full flex flex-col items-start gap-4 pt-2"
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-6">
-                <motion.div
-                  whileHover={{ scale: 1.005 }}
-                  whileTap={{ scale: 0.985 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  className="relative"
-                >
+                <div className="relative press">
                   <Link
                     href="/assess"
                     onClick={() => {
@@ -247,19 +224,11 @@ export default function Landing({
                     className="relative group inline-flex items-center justify-center gap-2 bg-foreground text-accent-fg rounded-2xl py-3.5 px-6 font-medium text-[15px] shadow-[0_10px_30px_-12px_rgba(10,10,10,0.45)]"
                   >
                     Find my course
-                    <motion.span
-                      className="inline-flex"
-                      animate={reduced ? undefined : { x: [0, 3, 0] }}
-                      transition={
-                        reduced
-                          ? undefined
-                          : { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
-                      }
-                    >
+                    <span className="inline-flex nudge-x">
                       <ArrowRight className="w-4 h-4" />
-                    </motion.span>
+                    </span>
                   </Link>
-                </motion.div>
+                </div>
                 <ExamplesToggle
                   open={examplesOpen}
                   onToggle={() => setExamplesOpen((v) => !v)}
@@ -282,7 +251,7 @@ export default function Landing({
               </div>
 
               {hasPlan && <ContinueCard />}
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -362,16 +331,12 @@ export default function Landing({
         {/* What we heard: each finding paired with the decision it led to */}
         <section className="mt-20 sm:mt-28">
           <SectionEyebrow index="02">What we heard</SectionEyebrow>
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={{
-              visible: { transition: { staggerChildren: 0.08 } },
-            }}
-            className="mt-7 grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+          <InView
+            amount={0.2}
+            className="reveal-group mt-7 grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
           >
             <Stat
+              order={0}
               number={61}
               suffix="%"
               eyebrow="Survey"
@@ -379,6 +344,7 @@ export default function Landing({
               decision="So you get one pick and two alternatives, not a list."
             />
             <Stat
+              order={1}
               number={52}
               suffix="%"
               eyebrow="Survey"
@@ -386,6 +352,7 @@ export default function Landing({
               decision="So every pick shows what it costs at your pace, and a free way to start when there is one."
             />
             <Stat
+              order={2}
               number={87}
               suffix="%"
               eyebrow="Survey"
@@ -393,13 +360,14 @@ export default function Landing({
               decision="So you see a public rating with its source and date where one exists, and a message to send someone who took it. Ascend writes no reviews."
             />
             <Stat
+              order={3}
               number={48}
               suffix="h"
               eyebrow="North Star"
               label="is the number Ascend is built around."
               decision="A first session within two days of choosing."
             />
-          </motion.div>
+          </InView>
           <p className="mt-5 text-[12px] text-muted-2">
             Survey of early-career professionals (30+ responses) and 5 interviews, 2025.
           </p>
@@ -410,18 +378,17 @@ export default function Landing({
           <SectionEyebrow index="03" aside={modelName}>
             What the AI does
           </SectionEyebrow>
-          <motion.h2
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.6 }}
-            transition={{ duration: 0.6, ease: easeOut }}
-            className="mt-7 text-[1.625rem] sm:text-[2.125rem] leading-[1.08] tracking-[-0.02em] font-semibold text-foreground max-w-[24ch]"
+          <InView
+            as="h2"
+            amount={0.6}
+            style={reveal(10, 0.6)}
+            className="reveal mt-7 text-[1.625rem] sm:text-[2.125rem] leading-[1.08] tracking-[-0.02em] font-semibold text-foreground max-w-[24ch]"
           >
             Rules keep it honest.{" "}
             <span className="serif-italic font-normal text-foreground/85">
               The AI does the thinking a quiz can&apos;t.
             </span>
-          </motion.h2>
+          </InView>
           <p className="mt-4 text-[14px] sm:text-[15px] leading-relaxed text-muted max-w-[60ch]">
             Four jobs, each one visible on your screen and checked by code.
             Below, what each job returned for one example person, a customer
@@ -465,26 +432,18 @@ export default function Landing({
         {/* Where it helps: the directions that pass MIN_ENTRIES */}
         <section className="mt-20 sm:mt-28 mb-12">
           <SectionEyebrow index="04">Where it helps</SectionEyebrow>
-          <motion.ul
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
-            className="mt-7 flex flex-wrap items-baseline gap-x-6 gap-y-2.5 text-[15px] sm:text-base text-foreground/85"
+          <InView
+            as="ul"
+            amount={0.3}
+            className="reveal-group mt-7 flex flex-wrap items-baseline gap-x-6 gap-y-2.5 text-[15px] sm:text-base text-foreground/85"
           >
             {/* Plain text like the providers row, not pills: a list, not buttons. */}
-            {moves.map((m) => (
-              <motion.li
-                key={m.id}
-                variants={{
-                  hidden: { opacity: 0, y: 6 },
-                  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: easeOut } },
-                }}
-              >
+            {moves.map((m, i) => (
+              <li key={m.id} style={reveal(6, 0.4, i * 0.04)}>
                 {m.label}
-              </motion.li>
+              </li>
             ))}
-          </motion.ul>
+          </InView>
           <p className="mt-5 text-[13.5px] leading-relaxed text-muted max-w-[62ch]">
             Ascend covers {moves.length} directions, each with courses
             checked one by one. Not here yet?{" "}
@@ -584,13 +543,7 @@ function Feature({
   body: string;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.4 }}
-      transition={{ duration: 0.5, ease: easeOut }}
-      className="flex flex-col gap-2"
-    >
+    <InView amount={0.4} style={reveal(8, 0.5)} className="reveal flex flex-col gap-2">
       <span className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
         {num}
       </span>
@@ -598,7 +551,7 @@ function Feature({
         {title}
       </h3>
       <p className="text-[12.5px] leading-relaxed text-muted">{body}</p>
-    </motion.div>
+    </InView>
   );
 }
 
@@ -614,13 +567,10 @@ function Step({
   example: JobExample;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.6, ease: easeOut }}
-      whileHover={{ y: -2 }}
-      className="bg-card border border-border-soft rounded-2xl p-6 sm:p-7 flex flex-col gap-3 card-elev card-elev-hover"
+    <InView
+      amount={0.3}
+      style={reveal(12, 0.6)}
+      className="reveal lift bg-card border border-border-soft rounded-2xl p-6 sm:p-7 flex flex-col gap-3 card-elev card-elev-hover"
     >
       <div className="flex items-baseline justify-between gap-4">
         <span className="serif-italic text-[22px] text-foreground/75 leading-none">
@@ -661,17 +611,20 @@ function Step({
           </dd>
         </div>
       </dl>
-    </motion.div>
+    </InView>
   );
 }
 
 function Stat({
+  order,
   number,
   suffix,
   label,
   eyebrow,
   decision,
 }: {
+  /** position in the row, for the stagger */
+  order: number;
   number: number;
   suffix?: string;
   label: string;
@@ -679,52 +632,37 @@ function Stat({
   /** what Ascend does because of this finding */
   decision: string;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.5 });
-  const [display, setDisplay] = useState(`0${suffix ?? ""}`);
-  const count = useMotionValue(0);
-  const rounded = useTransform(count, (v) => Math.round(v));
   const reduced = useReducedMotion();
+  const numRef = useRef<HTMLDivElement>(null);
+  const end = `${number}${suffix ?? ""}`;
+  // Counts up once half of the card is in view. The number is written
+  // straight into its text node, so the count re-renders nothing.
+  const ref = useInViewOnce<HTMLDivElement>(0.5, () => {
+    if (reduced) writeText(numRef.current, end);
+    else countUp(numRef.current, number, suffix ?? "");
+  });
 
+  // Reduced motion jumps straight to the final number instead of counting up.
   useEffect(() => {
-    const unsubscribe = rounded.on("change", (v) =>
-      setDisplay(`${v}${suffix ?? ""}`),
-    );
-    if (!inView && !reduced) return unsubscribe;
-    // Reduced motion jumps straight to the final number instead of counting up.
-    const controls = animate(
-      count,
-      number,
-      reduced ? { duration: 0 } : { duration: 1.2, ease: easeOut, delay: 0.3 },
-    );
-    return () => {
-      unsubscribe();
-      controls.stop();
-    };
-  }, [number, suffix, count, rounded, reduced, inView]);
+    if (reduced) writeText(numRef.current, end);
+  }, [reduced, end]);
 
   // Phones: the number on the left, finding and decision beside it. Wider: stacked.
   return (
-    <motion.div
+    <div
       ref={ref}
-      variants={{
-        hidden: { opacity: 0, y: 8 },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: 0.4, ease: easeOut },
-        },
-      }}
-      whileHover={{ y: -2 }}
-      transition={{ type: "spring", stiffness: 300, damping: 25 }}
-      className="bg-card border border-border-soft rounded-2xl p-5 sm:p-6 card-elev card-elev-hover grid grid-cols-[4.5rem_1fr] gap-x-4 min-[420px]:flex min-[420px]:flex-col"
+      style={reveal(8, 0.4, order * 0.08)}
+      className="lift bg-card border border-border-soft rounded-2xl p-5 sm:p-6 card-elev card-elev-hover grid grid-cols-[4.5rem_1fr] gap-x-4 min-[420px]:flex min-[420px]:flex-col"
     >
       <div className="col-span-2 mono-label text-[9px] sm:text-[10px] uppercase tracking-[0.26em] text-muted-2 mb-3">
         {eyebrow}
       </div>
       <div className="flex items-baseline gap-1">
-        <div className="text-[2rem] sm:text-[2.5rem] font-semibold text-foreground tabular-nums leading-none tracking-[-0.025em]">
-          {display}
+        <div
+          ref={numRef}
+          className="text-[2rem] sm:text-[2.5rem] font-semibold text-foreground tabular-nums leading-none tracking-[-0.025em]"
+        >
+          {`0${suffix ?? ""}`}
         </div>
       </div>
       <div className="min-[420px]:mt-2">
@@ -733,6 +671,31 @@ function Stat({
           {decision}
         </p>
       </div>
-    </motion.div>
+    </div>
   );
+}
+
+/** Replaces the text React rendered in `el`, keeping React's own text node. */
+function writeText(el: HTMLElement | null, value: string) {
+  const text = el?.firstChild;
+  if (text) text.nodeValue = value;
+}
+
+/** 0 to `to` over 1.2 s after 0.3 s, with the house easing, one text write per whole number. */
+function countUp(el: HTMLElement | null, to: number, suffix: string) {
+  const DELAY = 300;
+  const DURATION = 1200;
+  let start = -1;
+  let last = -1;
+  const frame = (now: number) => {
+    if (start < 0) start = now + DELAY;
+    const t = Math.min(1, Math.max(0, (now - start) / DURATION));
+    const v = Math.round(to * easeOut(t));
+    if (v !== last) {
+      last = v;
+      writeText(el, `${v}${suffix}`);
+    }
+    if (t < 1) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
 }

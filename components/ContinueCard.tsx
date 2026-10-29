@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { courseById } from "@/lib/catalog";
 import { fmtDay, fmtTime, toLocalISODate } from "@/lib/format";
@@ -13,7 +12,7 @@ import {
   planPath,
   type PlanPayloadV2,
 } from "@/lib/plan-store";
-import { easeOut, spring } from "@/components/ui";
+import { fadeUp } from "@/lib/motion";
 
 // False during prerender and hydration, true once in the browser, so the card
 // never renders on the server (the plan lives in localStorage).
@@ -98,12 +97,7 @@ export function ContinueCard() {
   if (!plan || !info) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: easeOut }}
-      className="w-full max-w-xl"
-    >
+    <div style={fadeUp(8, 0.5)} className="fade-up w-full max-w-xl">
       <div className="bg-card border border-border-soft rounded-2xl card-elev p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
         <div className="min-w-0 flex-1">
           <div className="mono-label text-[10px] uppercase tracking-[0.22em] text-muted-2">
@@ -122,12 +116,7 @@ export function ContinueCard() {
           </div>
           <div className="mt-0.5 text-[13px] text-muted leading-snug truncate">{info.title}</div>
         </div>
-        <motion.div
-          whileHover={{ scale: 1.005 }}
-          whileTap={{ scale: 0.985 }}
-          transition={spring}
-          className="relative inline-flex self-start sm:self-auto shrink-0"
-        >
+        <div className="press relative inline-flex self-start sm:self-auto shrink-0">
           {/* A full load, so /plan reads the hash on arrival exactly as it does for a shared link. */}
           <a
             href={href}
@@ -136,8 +125,8 @@ export function ContinueCard() {
             Open your plan
             <ArrowRight aria-hidden className="w-4 h-4" />
           </a>
-        </motion.div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

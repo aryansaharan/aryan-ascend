@@ -1,12 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { GapMark } from "@/components/PickCard";
-import { Card, SecondaryButton, SectionLabel, easeOut } from "@/components/ui";
+import { Card, SecondaryButton, SectionLabel } from "@/components/ui";
 import type { Course } from "@/lib/course-types";
 import type { Candidate } from "@/lib/fit";
 import { checkedLabel, costLine, paceLine, type DisplayCurrency } from "@/lib/format";
 import type { Alternate, CandidateCoverage } from "@/lib/pick-types";
+import { fadeUp } from "@/lib/motion";
 import { matchFor } from "@/lib/skills";
 import { coverageCountLine } from "@/lib/templates";
 
@@ -45,11 +45,10 @@ export function Alternates({
       </SectionLabel>
       <div className="flex flex-col gap-3">
         {rows.map((r, idx) => (
-          <motion.div
+          <div
             key={r.alt.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.05 * idx, ease: easeOut }}
+            style={fadeUp(10, 0.45, 0.05 * idx)}
+            className="fade-up"
           >
             <Card padded={false} className="p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
@@ -84,7 +83,7 @@ export function Alternates({
                 </SecondaryButton>
               </div>
             </Card>
-          </motion.div>
+          </div>
         ))}
       </div>
     </section>

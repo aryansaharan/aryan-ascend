@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import {
   BlinkCaret,
@@ -13,8 +12,8 @@ import {
   SkeletonLine,
   TextLink,
   ToggleChip,
-  easeOut,
 } from "@/components/ui";
+import { Collapse } from "@/components/Presence";
 import type { Course, MoveId } from "@/lib/course-types";
 import {
   OBSTACLES,
@@ -30,6 +29,7 @@ import {
   type Obstacle,
 } from "@/lib/booking";
 import { fmtDay, fmtDayTime, fmtTime, toLocalISODate } from "@/lib/format";
+import { fadeUp } from "@/lib/motion";
 import { buildWeeks } from "@/lib/plan-build";
 import { TAILOR_LOADING } from "@/lib/templates";
 import { keepTimes } from "@/components/PlanWeeks";
@@ -339,16 +339,9 @@ export function BookingSheet({
               </div>
             </div>
 
-            <AnimatePresence initial={false}>
+            <Collapse open={Boolean(s && obstacle && k)} duration={0.35}>
               {s && obstacle && k && (
-                <motion.div
-                  key="plan-b"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.35, ease: easeOut }}
-                  className="overflow-hidden"
-                >
+                <>
                   <div className="mt-5 pt-4 border-t border-border-soft flex flex-col gap-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <span className="text-[13px] text-muted">Backup slot</span>
@@ -385,9 +378,9 @@ export function BookingSheet({
                       </p>
                     </div>
                   </div>
-                </motion.div>
+                </>
               )}
-            </AnimatePresence>
+            </Collapse>
           </Card>
         </div>
       </fieldset>
@@ -436,13 +429,7 @@ export function TailoringPreview({
   const weeks = buildWeeks({ course, n, h, s: s.toISOString(), move }).weeks;
   const shown = weeks.slice(0, 4);
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: easeOut }}
-      role="status"
-      aria-live="polite"
-    >
+    <div style={fadeUp(10, 0.45)} className="fade-up" role="status" aria-live="polite">
       <Card>
         <EngineLine>
           {TAILOR_LOADING}
@@ -473,7 +460,7 @@ export function TailoringPreview({
           </p>
         )}
       </Card>
-    </motion.div>
+    </div>
   );
 }
 

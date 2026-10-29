@@ -1,102 +1,39 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
-import { Badge, Card, SectionLabel, SkeletonLine, TextLink, ToggleChip, easeOut } from "@/components/ui";
+import { AnimatePresence, LazyMotion, MotionConfig, domMax, m } from "framer-motion";
+import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
+import { OptionCard } from "@/components/CheckParts";
+import type { CheckState } from "@/components/check-state";
+import { Badge, Card, SectionLabel, TextLink, ToggleChip, easeOut } from "@/components/ui";
 import { stripPrompt, tidyRole } from "@/components/SituationInput";
 import { courseById } from "@/lib/catalog";
 import type { Baseline, MoveId } from "@/lib/course-types";
-import { MOVES, availableMoves, isAvailableMove } from "@/lib/moves";
+import { MOVES, availableMoves } from "@/lib/moves";
 import { isAiEngine } from "@/lib/pick-types";
-import {
-  LIMITS,
-  isBaseline,
-  isPrefersFormat,
-  type Mention,
-  type MentionStatus,
-  type PrefersFormat,
-  type Strength,
-} from "@/lib/profile";
+import { LIMITS, type MentionStatus, type PrefersFormat } from "@/lib/profile";
 import { cleanGaps, skillLabel, skillsFor, type SkillId } from "@/lib/skills";
-import type { ProfileDraft } from "@/lib/store";
 import { MOVE_PHRASES } from "@/lib/templates";
-import type { ProfileEdits, Understanding as UnderstandingT, UnderstandResponse } from "@/lib/understand";
+import type { Understanding as UnderstandingT, UnderstandResponse } from "@/lib/understand";
 
 // Step 4 of /assess, "Check". When the AI (or the dev mock) read the
 // situation, this is the read-back: every part of what Ascend understood,
 // each one editable. When it couldn't, the same screen shows manual controls
 // with an honest label. Either way the page turns the result into a profile
-// with profileFromUnderstanding().
-
-/** Everything the person can change on the Check step. */
-export type CheckState = {
-  role: string;
-  move: MoveId | null;
-  baseline: Baseline | null;
-  gaps: SkillId[];
-  strengths: Strength[];
-  mentioned: Mention[];
-  wantsCertificate: boolean;
-  prefersFormat: PrefersFormat;
-};
+// with profileFromUnderstanding(). Its state and the conversions around it
+// are in components/check-state.
+//
+// The list animations here (reordering gaps, removing a row, the switch knob)
+// are framer-motion layout animations, the only framer-motion left in the
+// app. /assess loads this file on its own, only for the Check step, so no
+// other page or step pays for the library. OptionCard and the chips are plain
+// CSS.
 
 /** "Up to three" on the manual path, "up to five" when the AI ranked them. */
 export const MANUAL_GAPS_MAX = 3;
 
 const CONTACT =
   "mailto:aryansaharan30@gmail.com?subject=" + encodeURIComponent("A direction for Ascend");
-
-/**
- * The starting state: what was understood, or, when the person already
- * confirmed this same situation before (a saved profile with a move), their
- * earlier answers, so "Edit answers" doesn't throw their fixes away.
- */
-export function checkStateFrom(u: UnderstandingT, saved?: ProfileDraft | null): CheckState {
-  if (saved?.move && isAvailableMove(saved.move)) {
-    return {
-      role: tidyRole(saved.currentRole ?? u.role),
-      move: saved.move,
-      baseline: isBaseline(saved.baseline) ? saved.baseline : null,
-      gaps: cleanGaps(saved.move, saved.gaps ?? []),
-      strengths: saved.strengths ?? [],
-      mentioned: saved.mentioned ?? [],
-      wantsCertificate: saved.wantsCertificate === true,
-      prefersFormat: isPrefersFormat(saved.prefersFormat) ? saved.prefersFormat : "any",
-    };
-  }
-  return {
-    role: tidyRole(u.role),
-    move: u.move,
-    baseline: u.move ? u.baseline : null,
-    gaps: u.move ? cleanGaps(u.move, u.gaps.map((g) => g.id)) : [],
-    strengths: u.strengths,
-    mentioned: u.mentioned,
-    wantsCertificate: u.wantsCertificate,
-    prefersFormat: u.prefersFormat,
-  };
-}
-
-/** The edits passed to profileFromUnderstanding: the whole Check state. */
-export function editsFrom(s: CheckState): ProfileEdits {
-  return {
-    currentRole: s.role,
-    ...(s.move ? { move: s.move } : {}),
-    ...(s.baseline !== null ? { baseline: s.baseline } : {}),
-    gaps: s.gaps,
-    strengths: s.strengths,
-    mentioned: s.mentioned,
-    wantsCertificate: s.wantsCertificate,
-    prefersFormat: s.prefersFormat,
-  };
-}
-
-/** What still blocks "Looks right", or null. */
-export function missingFor(s: CheckState): "move" | "baseline" | null {
-  if (!s.move) return "move";
-  if (s.baseline === null) return "baseline";
-  return null;
-}
 
 /**
  * A new direction: the starting-point anchors and the skill vocabulary belong
@@ -132,64 +69,8 @@ const FORMAT_LABEL: Record<PrefersFormat, string> = {
 // Small pieces ------------------------------------------------------------------
 
 /** The /assess option card: label, optional hint, check circle. Black when selected. */
-export function OptionCard({
-  selected,
-  onClick,
-  label,
-  hint,
-  className,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  label: ReactNode;
-  hint?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <motion.button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.985 }}
-      transition={{ type: "spring", stiffness: 400, damping: 22 }}
-      className={`w-full text-left rounded-2xl px-4 py-3.5 border ${
-        selected
-          ? "border-foreground bg-foreground text-accent-fg shadow-[0_2px_10px_-4px_rgba(0,0,0,0.18)]"
-          : "border-border bg-card hover:border-foreground/30 hover:shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
-      } ${className ?? ""}`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className={`text-[15px] font-medium ${selected ? "" : "text-foreground"}`}>{label}</div>
-          {hint && (
-            <div className={`text-xs mt-0.5 ${selected ? "text-accent-fg/70" : "text-muted"}`}>{hint}</div>
-          )}
-        </div>
-        <motion.div
-          animate={selected ? { scale: 1 } : { scale: 0.9 }}
-          transition={{ type: "spring", stiffness: 500, damping: 22 }}
-          className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border ${
-            selected ? "border-accent-fg bg-accent-fg" : "border-border"
-          }`}
-        >
-          <AnimatePresence>
-            {selected && (
-              <motion.span
-                initial={{ scale: 0, rotate: -90 }}
-                animate={{ scale: 1, rotate: 0 }}
-                exit={{ scale: 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 20 }}
-              >
-                <Check className="w-3 h-3 text-foreground" />
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
-    </motion.button>
-  );
-}
+/** Press depth for the add chips (.tap in app/globals.css). */
+const TAP_94 = { "--tap": "0.94" } as React.CSSProperties;
 
 /** A 40px round icon button for up, down and remove. */
 function IconButton({
@@ -232,15 +113,13 @@ function AddChip({
   rank?: number;
 }) {
   return (
-    <motion.button
+    <button
       type="button"
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      whileHover={disabled ? undefined : { y: -1 }}
-      whileTap={disabled ? undefined : { scale: 0.94 }}
-      transition={{ type: "spring", stiffness: 500, damping: 20 }}
-      className={`inline-flex items-center gap-1.5 min-h-10 rounded-full px-3.5 py-2 text-sm border transition-opacity ${
+      style={TAP_94}
+      className={`tap inline-flex items-center gap-1.5 min-h-10 rounded-full px-3.5 py-2 text-sm border ${
         pressed
           ? "bg-foreground text-accent-fg border-foreground"
           : disabled
@@ -254,7 +133,7 @@ function AddChip({
         <Plus aria-hidden className="w-3.5 h-3.5" />
       )}
       {children}
-    </motion.button>
+    </button>
   );
 }
 
@@ -274,7 +153,7 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (next: boolean
           on ? "bg-foreground border-foreground justify-end" : "bg-card-alt border-border justify-start"
         }`}
       >
-        <motion.span
+        <m.span
           layout
           transition={{ type: "spring", stiffness: 600, damping: 32 }}
           className={`block w-4 h-4 rounded-full ${on ? "bg-accent-fg" : "bg-card border border-border shadow-[0_1px_2px_rgba(0,0,0,0.08)]"}`}
@@ -321,14 +200,14 @@ function Question({ title, note, children }: { title: string; note?: ReactNode; 
 
 function Reveal({ children }: { children: ReactNode }) {
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.3, ease: easeOut }}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -435,11 +314,11 @@ function Mentions({ state, onChange }: { state: CheckState; onChange: (s: CheckS
     >
       <Card as="ul" padded={false} className="divide-y divide-border-soft">
         <AnimatePresence initial={false}>
-          {state.mentioned.map((m, i) => {
-            const course = m.courseId ? courseById(m.courseId) : undefined;
+          {state.mentioned.map((mention, i) => {
+            const course = mention.courseId ? courseById(mention.courseId) : undefined;
             return (
-              <motion.li
-                key={`${m.text}-${i}`}
+              <m.li
+                key={`${mention.text}-${i}`}
                 layout
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25, ease: easeOut }}
@@ -447,8 +326,8 @@ function Mentions({ state, onChange }: { state: CheckState; onChange: (s: CheckS
               >
                 <div className="flex-1 min-w-0 py-1">
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                    <Quote>{m.text}</Quote>
-                    <Badge>{STATUS_LABEL[m.status]}</Badge>
+                    <Quote>{mention.text}</Quote>
+                    <Badge>{STATUS_LABEL[mention.status]}</Badge>
                   </div>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
                     {course ? (
@@ -464,12 +343,12 @@ function Mentions({ state, onChange }: { state: CheckState; onChange: (s: CheckS
                   </p>
                 </div>
                 <IconButton
-                  label={`Remove ${m.text}`}
+                  label={`Remove ${mention.text}`}
                   onClick={() => onChange({ ...state, mentioned: state.mentioned.filter((_, j) => j !== i) })}
                 >
                   <X className="w-4 h-4" />
                 </IconButton>
-              </motion.li>
+              </m.li>
             );
           })}
         </AnimatePresence>
@@ -533,7 +412,7 @@ function GapList({
           {gaps.map((id, i) => {
             const reason = reasonOf(id);
             return (
-              <motion.li
+              <m.li
                 key={id}
                 layout
                 transition={{ type: "spring", stiffness: 500, damping: 40 }}
@@ -566,7 +445,7 @@ function GapList({
                     {reason}
                   </p>
                 )}
-              </motion.li>
+              </m.li>
             );
           })}
         </Card>
@@ -722,7 +601,7 @@ function ReadBack({
             <Card as="ul" padded={false} className="divide-y divide-border-soft">
               <AnimatePresence initial={false}>
                 {state.strengths.map((s) => (
-                  <motion.li
+                  <m.li
                     key={`${s.label}-${s.quote}`}
                     layout
                     exit={{ opacity: 0 }}
@@ -743,7 +622,7 @@ function ReadBack({
                     >
                       <X className="w-4 h-4" />
                     </IconButton>
-                  </motion.li>
+                  </m.li>
                 ))}
               </AnimatePresence>
             </Card>
@@ -881,36 +760,16 @@ export function Understanding({
   state: CheckState;
   onChange: (s: CheckState) => void;
 }) {
-  return isAiEngine(response.engine) ? (
-    <ReadBack u={response.understanding} state={state} onChange={onChange} />
-  ) : (
-    <Manual u={response.understanding} state={state} onChange={onChange} />
-  );
-}
-
-/** Placeholder while /api/understand is still running (the page caps the wait at 10 s). */
-export function UnderstandingSkeleton() {
   return (
-    <div aria-hidden>
-      <Card padded={false} className="divide-y divide-border-soft">
-        {[0.62, 0.38, 0.7].map((w, i) => (
-          <div key={i} className="px-4 sm:px-6 py-4 sm:py-5">
-            <SkeletonLine className="w-20 h-2.5" />
-            <SkeletonLine className="mt-3.5 h-3.5" />
-            <span className="block" style={{ width: `${w * 100}%` }}>
-              <SkeletonLine className="mt-2 h-3" />
-            </span>
-          </div>
-        ))}
-      </Card>
-      <div className="mt-9">
-        <SkeletonLine className="w-36 h-2.5" />
-        <div className="mt-4 flex flex-wrap gap-2">
-          {[9, 12, 8].map((w, i) => (
-            <span key={i} className="block h-10 rounded-full bg-card-alt animate-pulse" style={{ width: `${w}rem` }} />
-          ))}
-        </div>
-      </div>
-    </div>
+    <LazyMotion features={domMax} strict>
+      {/* transforms and layout jump instead of moving under reduced motion; fades stay */}
+      <MotionConfig reducedMotion="user">
+        {isAiEngine(response.engine) ? (
+          <ReadBack u={response.understanding} state={state} onChange={onChange} />
+        ) : (
+          <Manual u={response.understanding} state={state} onChange={onChange} />
+        )}
+      </MotionConfig>
+    </LazyMotion>
   );
 }

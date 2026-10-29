@@ -1,19 +1,35 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { animate, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { FunnelStage } from "@/lib/fit";
+import { useReducedMotion } from "@/lib/hooks";
 
 // The funnel line under the read-back: real counts from fit(), stage by stage.
 // While a fresh pick loads it plays once: each stage fades in and its count
 // ticks down from the stage before it, so "rules first" is something you see.
 // The last stage ("1 pick") waits for the answer when `hold` is set. Reduced
 // motion, a cached pick and every later change show the final line.
+//
+// The reveal writes each stage's opacity and count straight into the DOM from
+// one requestAnimationFrame loop, so nothing re-renders 60 times a second.
+// React renders the starting frame (or the final line); the loop only changes
+// what React rendered, through the same text nodes, so a later render with new
+// counts still lands.
 
 const STAGE_SECONDS = 0.24;
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
+}
+
+/** Stage `i` at progress `p` (0 to stages.length): its count and opacity. */
+function frameOf(stages: FunnelStage[], i: number, p: number): { shown: number; opacity: number } {
+  const f = Math.min(1, Math.max(0, p - i));
+  const from = i === 0 ? 0 : stages[i - 1].count;
+  return {
+    shown: Math.round(from + (stages[i].count - from) * easeOutCubic(f)),
+    opacity: Math.min(1, f * 3),
+  };
 }
 
 export function Funnel({
@@ -39,12 +55,35 @@ export function Funnel({
   const animated = play && !reduced;
   const n = stages.length;
   const target = hold ? n - 1 : n;
-  const [progress, setProgress] = useState(0);
   const at = useRef(0);
   const callbacks = useRef({ onHeld, onDone });
+  const latest = useRef(stages);
+  /** each stage's element and the span holding its count, by index */
+  const els = useRef<(HTMLSpanElement | null)[]>([]);
+  const counts = useRef<(HTMLSpanElement | null)[]>([]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     callbacks.current = { onHeld, onDone };
+    latest.current = stages;
+  });
+
+  // Writes progress `p` into the stages on screen.
+  const paint = useCallback((p: number) => {
+    const list = latest.current;
+    for (let i = 0; i < list.length; i++) {
+      const el = els.current[i];
+      if (!el) continue;
+      const { shown, opacity } = frameOf(list, i, p);
+      el.style.opacity = String(opacity);
+      const text = counts.current[i]?.firstChild;
+      if (text && text.nodeValue !== String(shown)) text.nodeValue = String(shown);
+    }
+  }, []);
+
+  // A render mid-reveal (the answer arriving, say) shows React's starting
+  // frame; put the current progress back before it is painted.
+  useLayoutEffect(() => {
+    if (animated) paint(at.current);
   });
 
   useEffect(() => {
@@ -54,35 +93,45 @@ export function Funnel({
       if (target === n) callbacks.current.onDone?.();
       return;
     }
-    const controls = animate(from, target, {
-      duration: (target - from) * STAGE_SECONDS,
-      ease: "linear",
-      onUpdate: (v) => {
-        at.current = v;
-        setProgress(v);
-      },
-      onComplete: () => {
-        if (target === n) callbacks.current.onDone?.();
-        else callbacks.current.onHeld?.();
-      },
+    const ms = (target - from) * STAGE_SECONDS * 1000;
+    let start = -1;
+    let raf = requestAnimationFrame(function tick(now) {
+      if (start < 0) start = now;
+      const t = Math.min(1, (now - start) / ms);
+      at.current = from + (target - from) * t;
+      paint(at.current);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else if (target === n) callbacks.current.onDone?.();
+      else callbacks.current.onHeld?.();
     });
-    return () => controls.stop();
-  }, [animated, target, n]);
+    return () => cancelAnimationFrame(raf);
+  }, [animated, target, n, paint]);
 
-  const p = animated ? progress : n;
+  // React renders the first frame of the reveal, or the final line.
+  const p = animated ? 0 : n;
   const finalText = stages.map((s) => `${s.count} ${s.suffix}`).join(", ");
 
   const stage = (s: FunnelStage, i: number) => {
-    const f = Math.min(1, Math.max(0, p - i));
-    const from = i === 0 ? 0 : stages[i - 1].count;
-    const shown = Math.round(from + (s.count - from) * easeOutCubic(f));
-    const visible = Math.min(1, f * 3);
+    const { shown, opacity } = frameOf(stages, i, p);
     const last = s.key === "pick";
+    const count = (cls: string) => (
+      <span
+        ref={(el) => {
+          counts.current[i] = el;
+        }}
+        className={cls}
+      >
+        {shown}
+      </span>
+    );
     return (
       <span
         key={s.key}
+        ref={(el) => {
+          els.current[i] = el;
+        }}
         className="mono-label inline-flex items-center whitespace-nowrap before:content-['·'] before:inline-block before:w-5 before:text-center before:text-border"
-        style={{ opacity: visible }}
+        style={{ opacity }}
       >
         {last ? (
           <span
@@ -90,11 +139,11 @@ export function Funnel({
               s.count > 0 ? "bg-foreground text-accent-fg" : "border border-border text-muted"
             }`}
           >
-            <span className="mono-label tabular-nums">{shown}</span>&nbsp;{s.suffix}
+            {count("mono-label tabular-nums")}&nbsp;{s.suffix}
           </span>
         ) : (
           <span className="mono-label">
-            <span className="mono-label tabular-nums text-foreground">{shown}</span> {s.suffix}
+            {count("mono-label tabular-nums text-foreground")} {s.suffix}
           </span>
         )}
       </span>

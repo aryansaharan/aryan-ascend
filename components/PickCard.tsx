@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { ArrowRight, Check, ExternalLink, FastForward } from "lucide-react";
 import {
   Badge,
@@ -10,8 +9,8 @@ import {
   PrimaryButton,
   SecondaryButton,
   SectionLabel,
-  easeOut,
 } from "@/components/ui";
+import { fadeUp } from "@/lib/motion";
 import type { Course } from "@/lib/course-types";
 import type { Candidate } from "@/lib/fit";
 import {
@@ -205,10 +204,9 @@ export function PickCard({
   const missing = candidate?.prereqMissing ?? [];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: easeOut }}
+    <div
+      style={fadeUp(14, 0.55)}
+      className="fade-up"
     >
       <Card as="article" padded={false} className="p-5 sm:p-8" aria-labelledby="pick-title">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
@@ -335,6 +333,6 @@ export function PickCard({
           )}
         </div>
       </Card>
-    </motion.div>
+    </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, MessageCircle, Search } from "lucide-react";
 import { askSomeoneMessage, linkedInSearchUrl, whatsAppUrl } from "@/lib/templates";
-import { Card, SecondaryButton, SectionLabel, ToggleChip, easeOut } from "@/components/ui";
+import { Presence } from "@/components/Presence";
+import { Card, SecondaryButton, SectionLabel, ToggleChip } from "@/components/ui";
+import { fadeUp, leave } from "@/lib/motion";
 
 // "Ask someone who took it" (spec 3.4). Real peer signal instead of reviews:
 // a prefilled message the user can edit, copy or send, and a LinkedIn people
@@ -180,19 +181,17 @@ export function AskSomeone({
             {copied === "ok" ? "Message copied" : copied === "failed" ? "Couldn't copy the message" : ""}
           </span>
 
-          <AnimatePresence initial={false}>
-            {copied === "failed" && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease: easeOut }}
-                className="mt-3 text-[12px] text-muted"
-              >
-                This browser blocked copying. Select the message above and copy it yourself.
-              </motion.p>
-            )}
-          </AnimatePresence>
+          <Presence
+            id={copied === "failed" ? "failed" : null}
+            enter="fade-up"
+            exit="fade-out"
+            initial={false}
+            style={{ ...fadeUp(-4, 0.3), ...leave(0, 0.3) }}
+          >
+            <p className="mt-3 text-[12px] text-muted">
+              This browser blocked copying. Select the message above and copy it yourself.
+            </p>
+          </Presence>
         </div>
       </div>
 

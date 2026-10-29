@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { MotionProvider } from "@/components/MotionProvider";
 import { SiteAnalytics } from "@/components/SiteAnalytics";
-import { SmoothScroll } from "@/components/SmoothScroll";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -92,8 +90,7 @@ export default function RootLayout({
       className={`${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground">
-        <SmoothScroll />
-        <MotionProvider>{children}</MotionProvider>
+        {children}
         <SiteAnalytics />
       </body>
     </html>

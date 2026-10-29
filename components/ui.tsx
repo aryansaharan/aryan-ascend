@@ -1,19 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
+import { fadeUp } from "@/lib/motion";
 
 // Shared primitives in Ascend's existing visual language: cream page, white
 // hairline cards with card-elev, black rounded-2xl buttons, JetBrains Mono
 // micro-labels (uppercase only for short labels), Instrument Serif italic
 // accents, easeOut
 // [0.16, 1, 0.3, 1] and soft spring hovers. Every interactive element is at
-// least 40px tall.
+// least 40px tall. Hovers, presses and fades are CSS (app/globals.css: .press,
+// .tap, .fade-up, .blink), so these primitives load no animation library.
 
-export const easeOut = [0.16, 1, 0.3, 1] as const;
-export const spring = { type: "spring", stiffness: 300, damping: 25 } as const;
+export { easeOut } from "@/lib/motion";
 
 function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -225,16 +225,7 @@ function ButtonBase({ base, props }: { base: string; props: ButtonProps }) {
     );
   }
   const disabled = props.href === undefined && props.disabled;
-  return (
-    <motion.div
-      whileHover={disabled ? undefined : { scale: 1.005 }}
-      whileTap={disabled ? undefined : { scale: 0.985 }}
-      transition={spring}
-      className={cx("relative", full ? "w-full" : "inline-flex")}
-    >
-      {el}
-    </motion.div>
-  );
+  return <div className={cx("relative", !disabled && "press", full ? "w-full" : "inline-flex")}>{el}</div>;
 }
 
 /** The black pill: "Find my course", "Book my first session". Link when `href` is set. */
@@ -323,16 +314,13 @@ export function ToggleChip({
   className?: string;
 }) {
   return (
-    <motion.button
+    <button
       type="button"
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      whileHover={disabled ? undefined : { y: -1 }}
-      whileTap={disabled ? undefined : { scale: 0.96 }}
-      transition={{ type: "spring", stiffness: 500, damping: 20 }}
       className={cx(
-        "inline-flex items-center justify-center min-h-10 rounded-full px-4 text-[14px] border transition-opacity",
+        "tap inline-flex items-center justify-center min-h-10 rounded-full px-4 text-[14px] border",
         pressed
           ? "bg-foreground text-accent-fg border-foreground"
           : "bg-card text-foreground border-border hover:border-foreground/30",
@@ -341,7 +329,7 @@ export function ToggleChip({
       )}
     >
       {children}
-    </motion.button>
+    </button>
   );
 }
 
@@ -349,17 +337,7 @@ export function ToggleChip({
 
 /** The blinking caret from the original streaming UI. Still under reduced motion. */
 export function BlinkCaret() {
-  const reduced = useReducedMotion();
-  const cls = "inline-block w-[2px] h-[1em] translate-y-[2px] ml-0.5 bg-foreground/70";
-  if (reduced) return <span aria-hidden className={cls} />;
-  return (
-    <motion.span
-      aria-hidden
-      animate={{ opacity: [1, 0.15, 1] }}
-      transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-      className={cls}
-    />
-  );
+  return <span aria-hidden className="blink inline-block w-[2px] h-[1em] translate-y-[2px] ml-0.5 bg-foreground/70" />;
 }
 
 /** Placeholder bar for skeleton cards. */
@@ -367,7 +345,7 @@ export function SkeletonLine({ className }: { className?: string }) {
   return <span aria-hidden className={cx("block h-3 rounded-full bg-card-alt animate-pulse", className)} />;
 }
 
-/** Fade-and-rise wrapper with the house easing. Fade only under reduced motion. */
+/** Fade-and-rise wrapper with the house easing, played once on mount. Instant under reduced motion. */
 export function Reveal({
   children,
   delay = 0,
@@ -377,15 +355,9 @@ export function Reveal({
   delay?: number;
   className?: string;
 }) {
-  const reduced = useReducedMotion();
   return (
-    <motion.div
-      initial={{ opacity: 0, y: reduced ? 0 : 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: easeOut }}
-      className={className}
-    >
+    <div style={fadeUp(10, 0.5, delay)} className={cx("fade-up", className)}>
       {children}
-    </motion.div>
+    </div>
   );
 }
