@@ -88,6 +88,42 @@ export function labelAlternates(pick: Candidate, alts: Candidate[]): Alternate[]
 }
 
 /**
+ * Alternates have to close at least one of the person's gaps when the AI has
+ * read their coverage: an option the AI found closes none of their gaps isn't
+ * an alternative to the pick, whatever its price or length. Those are dropped
+ * and refilled, in rank order, from candidates the AI didn't rule out the
+ * same way; the list is never padded with them, so it can come back shorter.
+ * Keyword coverage (the rules path) is too coarse to prove a course closes
+ * nothing, so a zero from keywords never removes an alternate.
+ */
+export function usefulAlternates(
+  pick: Candidate,
+  alts: readonly Alternate[],
+  candidates: readonly Candidate[],
+  coverage: readonly CandidateCoverage[] | undefined,
+  gapCount: number,
+  max = 2,
+): Alternate[] {
+  if (gapCount === 0) return [...alts];
+  const provenUseless = (id: string) => {
+    const e = (coverage ?? []).find((c) => c.id === id);
+    return Boolean(e && e.source !== "keywords" && e.covered === 0);
+  };
+  if (!alts.some((a) => provenUseless(a.id))) return [...alts];
+  const byId = new Map(candidates.map((c) => [c.id, c]));
+  const keep = alts
+    .filter((a) => a.id !== pick.id && !provenUseless(a.id))
+    .map((a) => byId.get(a.id))
+    .filter((c): c is Candidate => Boolean(c));
+  for (const c of candidates) {
+    if (keep.length >= max) break;
+    if (c.id === pick.id || keep.some((k) => k.id === c.id) || provenUseless(c.id)) continue;
+    keep.push(c);
+  }
+  return labelAlternates(pick, keep.slice(0, max));
+}
+
+/**
  * Up to `max` alternates from the ranked rest (spec 5.2): the first candidate
  * that wins on any axis, then the first that wins on a different axis, else
  * the next ranked one ("Also fits your hours and budget.").
@@ -181,6 +217,36 @@ export function baseReceipt(profile: FitProfile, coverage: readonly CandidateCov
   };
 }
 
+// Words too broad to say a vaguely named mention is the same course as the
+// pick ("a management course" is not "Mastering Product Management").
+const GENERIC_WORDS = new Set([
+  "course", "courses", "certificate", "certification", "class", "classes", "program", "programme",
+  "specialization", "bootcamp", "tutorial", "intro", "introduction", "basics", "beginner", "beginners",
+  "advanced", "online", "free", "full", "complete", "guide", "fundamentals", "essentials", "foundations",
+  "professional", "mastering", "master", "learn", "learning", "machine", "data", "analysis", "analytics",
+  "management", "manager", "product", "project", "design", "designer", "marketing", "digital", "growth",
+  "engineering", "engineer", "development", "developer", "leadership", "leading", "people", "team",
+  "teams", "business", "strategy", "cloud", "user", "users", "experience", "writing", "content",
+  "google", "microsoft", "coursera", "udemy", "linkedin", "kaggle", "about", "from", "with", "your",
+  "that", "this", "some", "someone", "colleague", "suggested", "recommended", "friend",
+]);
+
+/**
+ * True when a mention the catalog couldn't match by name ("a pandas course")
+ * clearly names the same subject as the pick ("Pandas"): a distinctive word of
+ * at least four letters in the mention appears as a whole word in the pick's
+ * title. Used so the page never tells someone to do "a pandas course" after a
+ * pandas course.
+ */
+export function mentionMatchesCourse(text: string, course: Pick<Course, "title"> | null | undefined): boolean {
+  if (!course) return false;
+  const title = ` ${course.title.toLowerCase().replace(/[^a-z0-9+#]+/g, " ")} `;
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9+#]+/)
+    .some((w) => (w.length >= 4 || w === "sql") && !GENERIC_WORDS.has(w) && title.includes(` ${w} `));
+}
+
 /**
  * Keeps verdicts consistent with the pick on screen: "start-here" only for
  * the mentioned course that is the pick, and a catalog mention that became
@@ -195,8 +261,11 @@ export function reconcileVerdicts(
   return (verdicts ?? []).filter((v) => {
     const m = list[v.index];
     if (!m) return false;
-    if (v.verdict === "start-here") return m.courseId !== null && m.courseId === pickId;
-    return !(m.courseId !== null && m.courseId === pickId);
+    const isPick =
+      (m.courseId !== null && m.courseId === pickId) ||
+      (m.courseId === null && v.verdict !== "different-direction" && mentionMatchesCourse(m.text, pickId ? courseById(pickId) : null));
+    if (v.verdict === "start-here") return isPick;
+    return !isPick;
   });
 }
 
@@ -283,7 +352,7 @@ export function rulesDecision(
     ...base,
     ...(reason ? { reason } : {}),
     pickId: pick.id,
-    alternates: pickAlternates(pick, cands.slice(1)),
+    alternates: usefulAlternates(pick, pickAlternates(pick, cands.slice(1)), cands, coverage, base.gaps.length),
     whyThisOne: whyThisOneTemplate(pickCourse, profile, adjust, currency),
     useItAtWork: atWorkTemplate(profile),
   };
@@ -310,15 +379,16 @@ export function swapPick(
   const alts = slotIds
     .map((id) => byId.get(id))
     .filter((c): c is Candidate => Boolean(c) && c?.id !== newPickId);
+  const swappedCoverage = mergeCoverage(prev.coverage, ctx.result.candidates);
   return {
     ...pickResponseOf(prev),
     pickId: newPickId,
-    alternates: labelAlternates(next, alts),
+    alternates: usefulAlternates(next, labelAlternates(next, alts), ctx.result.candidates, swappedCoverage, (prev.gaps ?? []).length),
     whyThisOne: whyThisOneTemplate(nextCourse, ctx.profile, ctx.adjust, currency),
     useItAtWork: atWorkTemplate(ctx.profile),
     honestFit: "ok",
     gapNote: "",
-    coverage: mergeCoverage(prev.coverage, ctx.result.candidates),
+    coverage: swappedCoverage,
     vsRules: "",
     skim: [],
     mentionedVerdicts: reconcileVerdicts(prev.mentionedVerdicts, ctx.profile.mentioned, newPickId),
@@ -363,7 +433,7 @@ export function adjustPick(
     return {
       response: {
         ...pickResponseOf(prev),
-        alternates: labelAlternates(pick, [...kept, ...fill]),
+        alternates: usefulAlternates(pick, labelAlternates(pick, [...kept, ...fill]), result.candidates, coverage, (prev.gaps ?? []).length),
         rulesPickId,
         coverage,
         // the reason compared the pick with the old rules pick; keep it only if that didn't change

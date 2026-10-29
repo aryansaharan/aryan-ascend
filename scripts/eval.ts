@@ -20,7 +20,7 @@ import { courseById } from "../lib/catalog";
 import { COURSES, CATALOG_VERSION } from "../lib/courses";
 import { COURSE_SOURCES } from "../lib/course-sources";
 import { outlineHash, totalHours, type Course } from "../lib/course-types";
-import { adjustPick, rulesDecision, swapPick } from "../lib/decide-rules";
+import { adjustPick, mentionMatchesCourse, rulesDecision, swapPick, usefulAlternates } from "../lib/decide-rules";
 import { adjustDecision, decisionKey, isAiFailedFallback, makeDecision, saveDecision, shouldRetryAi, swapDecision } from "../lib/decision-store";
 import { EXAMPLES, exampleFor } from "../lib/examples";
 import {
@@ -961,7 +961,8 @@ section("unit:pick-verifier", () => {
   check(s, "strips '₹1,888' and falls back to the template", d.useItAtWork === templates.useItAtWork, d.useItAtWork);
   check(s, "replaces dashes", !DASH.test(d.whyThisOne) && d.whyThisOne.includes(", it builds"), d.whyThisOne);
   check(s, "removes numbers from vsRules", d.vsRules === "It is cheaper.", d.vsRules);
-  check(s, "dedupes and fills alternates", d.alternates.length === Math.min(2, ids.length - 1) && new Set(d.alternates.map((a) => a.id)).size === d.alternates.length && !d.alternates.some((a) => a.id === d.pickId));
+  // the AI mapped nothing for the rules' filler, so only the alternate that closes a gap stays
+  check(s, "dedupes alternates and keeps only ones that close a gap", d.alternates.length >= 1 && new Set(d.alternates.map((a) => a.id)).size === d.alternates.length && !d.alternates.some((a) => a.id === d.pickId) && d.alternates.every((a) => (d.coverage.find((c) => c.id === a.id)?.covered ?? 0) > 0), JSON.stringify(d.alternates));
   eq(s, "drops gapNote when the fit isn't weak", d.gapNote, "");
   check(s, "every candidate gets a coverage entry", d.coverage.length === ids.length && d.coverage.every((c, i) => c.id === ids[i] && c.source === "ai"));
   const pc = d.coverage.find((c) => c.id === ids[1]);
@@ -1655,6 +1656,39 @@ function enumUnder(node: unknown, prop: string, root: unknown): unknown[] | unde
   return undefined;
 }
 
+function mentionsAndAlternates(): void {
+  section("unit:mentions-alternates", () => {
+    const s = "unit:mentions-alternates";
+    const pandas = courseById("kaggle-pandas");
+    const sql = courseById("kaggle-intro-to-sql");
+    const pmReforge = courseById("reforge-mastering-product-management");
+    check(s, "catalog has the test courses", Boolean(pandas && sql && pmReforge));
+    check(s, "'a pandas course' is the Pandas pick", mentionMatchesCourse("A colleague suggested a pandas course", pandas));
+    check(s, "'an SQL course' is Intro to SQL", mentionMatchesCourse("an SQL course", sql));
+    check(s, "project management is not Mastering Product Management", !mentionMatchesCourse("Google Project Management certificate", pmReforge));
+    check(s, "a data analytics certificate is not Intro to SQL", !mentionMatchesCourse("Google Data Analytics certificate", sql));
+    check(s, "no course, no match", !mentionMatchesCourse("a pandas course", null));
+
+    // alternates have to close at least one gap
+    const prof = personaWith(4);
+    const r = fit(prof, NO_ADJUST, { now: NOW });
+    const [pick, a1, a2, a3] = r.candidates;
+    const cov = (id: string, covered: number) => ({ id, source: "ai" as const, gaps: [], covered, score: covered });
+    const coverage = r.candidates.map((c) => cov(c.id, c.id === pick.id ? 2 : c.id === a2.id || c.id === a3.id ? 1 : 0));
+    const alts = [{ id: a1.id, insteadIf: "x" }, { id: a2.id, insteadIf: "y" }];
+    const out = usefulAlternates(pick, alts, r.candidates, coverage, 3);
+    check(s, "an alternate that closes no gap is replaced", !out.some((a) => a.id === a1.id) && out.some((a) => a.id === a2.id), JSON.stringify(out.map((a) => a.id)));
+    check(s, "the replacement closes a gap", out.every((a) => coverage.find((c) => c.id === a.id)!.covered > 0) && out.length === 2);
+    const none = usefulAlternates(pick, alts, r.candidates, r.candidates.map((c) => cov(c.id, c.id === pick.id ? 1 : 0)), 3);
+    check(s, "never padded with alternates that close none", none.length === 0);
+    const noGaps = usefulAlternates(pick, alts, r.candidates, coverage, 0);
+    check(s, "with no gaps the alternates stay as they were", JSON.stringify(noGaps) === JSON.stringify(alts));
+    const kw = (id: string, covered: number) => ({ id, source: "keywords" as const, gaps: [], covered, score: covered });
+    const kwOut = usefulAlternates(pick, alts, r.candidates, [kw(pick.id, 1), kw(a1.id, 0), kw(a2.id, 0)], 3);
+    check(s, "a zero from keywords never removes an alternate", JSON.stringify(kwOut) === JSON.stringify(alts));
+  });
+}
+
 function landingRunNamesRealModules(): void {
   section("unit:landing-run", () => {
     const s = "unit:landing-run";
@@ -1895,6 +1929,7 @@ async function live(): Promise<AiRun[]> {
 async function main() {
   await planLinkChecks();
   await guardChecks();
+  mentionsAndAlternates();
   landingRunNamesRealModules();
   await anthropicWire();
   await simulated();
