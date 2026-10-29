@@ -219,7 +219,7 @@ export default function Landing({
               className="text-[11px] text-muted-2"
             >
               <span className="mono-label">
-                Built from 25+ interviews and a survey of early-career professionals.
+                Built from a survey of early-career professionals (30+ responses) and 5 interviews.
               </span>
             </motion.div>
 
@@ -401,7 +401,7 @@ export default function Landing({
             />
           </motion.div>
           <p className="mt-5 text-[12px] text-muted-2">
-            Survey of early-career professionals and 25+ interviews, 2025.
+            Survey of early-career professionals (30+ responses) and 5 interviews, 2025.
           </p>
         </section>
 

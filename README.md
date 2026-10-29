@@ -12,7 +12,7 @@ Product line: *Rules keep it honest. The AI does the thinking a quiz can't.*
 
 Early-career professionals, 1 to 5 years in, usually know the direction they want to grow in: building with AI, AI product management, product management, data analysis, UX design, leading a team, growth marketing, or cloud and DevOps. What stalls them is the next step. Ten course tabs stay open for weeks, nothing clearly wins, and the course they do buy often doesn't fit the hours that survive a bad week.
 
-From a survey of early-career professionals and 25+ interviews (2025): 61% named too many options as the problem, 52% feared paying for the wrong course, and 87% rated proof from other learners as decisive.
+From a survey of early-career professionals (30+ responses) and 5 interviews (2025): 61% named too many options as the problem, 52% feared paying for the wrong course, and 87% rated proof from other learners as decisive.
 
 ## The use case
 
@@ -113,5 +113,5 @@ Latest eval: 2,906 of 2,906 rules, catalog and unit checks passed on 26 Oct 2026
 
 - **Real:** the four AI jobs and their verifiers, the rules engine and its fallback, the funnel counts, the plan builder, calendar file and plan links.
 - **Catalog:** 69 courses, books, programs and guides across 8 directions, 9 per direction (a few serve two), each with its real module names, hours, price, sources and the free way in when there is one. One agent researched each entry and a second re-checked it against the pages in `sources`. Catalog checked: 20 Oct 2026. Prices change, so every course card shows when it was checked. Run `npm run check:catalog` before each deploy: it fetches every link and checks titles and module names against the source pages, but not prices, so check the paid entries' prices by hand too. A few providers block the checker (403); check those by hand.
-- **Research:** the landing figures come from a survey of early-career professionals and 25+ interviews in 2025.
+- **Research:** the landing figures come from a survey of early-career professionals with 30+ responses, plus 5 interviews, in 2025.
 - **Not here:** accounts, a database, reminders, reviews or ratings Ascend didn't check, and any claim about completion rates. Progress is saved on the device only.
